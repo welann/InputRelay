@@ -1,0 +1,112 @@
+{
+  "id": "preset-video-001",
+  "name": "视频播放器",
+  "mappings": [
+    {
+      "id": "map-video-001",
+      "button": "buttonA",
+      "action": {
+        "keyboardShortcut": {
+          "keyCode": 49,
+          "modifiers": {
+            "rawValue": 0
+          }
+        }
+      },
+      "enabled": true
+    },
+    {
+      "id": "map-video-002",
+      "button": "buttonB",
+      "action": {
+        "keyboardShortcut": {
+          "keyCode": 53,
+          "modifiers": {
+            "rawValue": 0
+          }
+        }
+      },
+      "enabled": true
+    },
+    {
+      "id": "map-video-003",
+      "button": "leftShoulder",
+      "action": {
+        "keyboardShortcut": {
+          "keyCode": 123,
+          "modifiers": {
+            "rawValue": 0
+          }
+        }
+      },
+      "enabled": true
+    },
+    {
+      "id": "map-video-004",
+      "button": "rightShoulder",
+      "action": {
+        "keyboardShortcut": {
+          "keyCode": 124,
+          "modifiers": {
+            "rawValue": 0
+          }
+        }
+      },
+      "enabled": true
+    },
+    {
+      "id": "map-video-005",
+      "button": "leftTrigger",
+      "action": {
+        "keyboardShortcut": {
+          "keyCode": 125,
+          "modifiers": {
+            "rawValue": 0
+          }
+        }
+      },
+      "enabled": true
+    },
+    {
+      "id": "map-video-006",
+      "button": "rightTrigger",
+      "action": {
+        "keyboardShortcut": {
+          "keyCode": 126,
+          "modifiers": {
+            "rawValue": 0
+          }
+        }
+      },
+      "enabled": true
+    }
+  ],
+  "appRules": [
+    {
+      "appName": "QuickTime Player"
+    },
+    {
+      "bundleID": "com.apple.QuickTimePlayerX"
+    },
+    {
+      "appName": "VLC"
+    },
+    {
+      "bundleID": "org.videolan.vlc"
+    },
+    {
+      "appName": "IINA"
+    },
+    {
+      "bundleID": "com.colliderli.iina"
+    }
+  ],
+  "stickSettings": {
+    "leftStickMode": "mouse",
+    "rightStickMode": "disabled",
+    "deadzone": 0.2,
+    "sensitivity": 1.0,
+    "accelerationCurve": "linear"
+  },
+  "isActive": false
+}

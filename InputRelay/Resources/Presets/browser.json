@@ -1,0 +1,128 @@
+{
+  "id": "preset-browser-001",
+  "name": "浏览器专用",
+  "mappings": [
+    {
+      "id": "map-browser-001",
+      "button": "buttonA",
+      "action": {
+        "keyboardShortcut": {
+          "keyCode": 36,
+          "modifiers": {
+            "rawValue": 0
+          }
+        }
+      },
+      "enabled": true
+    },
+    {
+      "id": "map-browser-002",
+      "button": "buttonB",
+      "action": {
+        "keyboardShortcut": {
+          "keyCode": 53,
+          "modifiers": {
+            "rawValue": 0
+          }
+        }
+      },
+      "enabled": true
+    },
+    {
+      "id": "map-browser-003",
+      "button": "buttonX",
+      "action": {
+        "keyboardShortcut": {
+          "keyCode": 17,
+          "modifiers": {
+            "rawValue": 1048576
+          }
+        }
+      },
+      "enabled": true
+    },
+    {
+      "id": "map-browser-004",
+      "button": "buttonY",
+      "action": {
+        "keyboardShortcut": {
+          "keyCode": 15,
+          "modifiers": {
+            "rawValue": 1048576
+          }
+        }
+      },
+      "enabled": true
+    },
+    {
+      "id": "map-browser-005",
+      "button": "leftShoulder",
+      "action": {
+        "keyboardShortcut": {
+          "keyCode": 33,
+          "modifiers": {
+            "rawValue": 1048576
+          }
+        }
+      },
+      "enabled": true
+    },
+    {
+      "id": "map-browser-006",
+      "button": "rightShoulder",
+      "action": {
+        "keyboardShortcut": {
+          "keyCode": 30,
+          "modifiers": {
+            "rawValue": 1048576
+          }
+        }
+      },
+      "enabled": true
+    },
+    {
+      "id": "map-browser-007",
+      "button": "leftTrigger",
+      "action": {
+        "mouseAction": "leftClick"
+      },
+      "enabled": true
+    },
+    {
+      "id": "map-browser-008",
+      "button": "rightTrigger",
+      "action": {
+        "mouseAction": "rightClick"
+      },
+      "enabled": true
+    }
+  ],
+  "appRules": [
+    {
+      "appName": "Safari"
+    },
+    {
+      "bundleID": "com.apple.Safari"
+    },
+    {
+      "appName": "Google Chrome"
+    },
+    {
+      "bundleID": "com.google.Chrome"
+    },
+    {
+      "appName": "Firefox"
+    },
+    {
+      "bundleID": "org.mozilla.firefox"
+    }
+  ],
+  "stickSettings": {
+    "leftStickMode": "mouse",
+    "rightStickMode": "scroll",
+    "deadzone": 0.15,
+    "sensitivity": 1.5,
+    "accelerationCurve": "accelerated"
+  },
+  "isActive": false
+}
