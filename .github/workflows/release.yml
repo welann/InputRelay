@@ -54,7 +54,7 @@ jobs:
           ARCH: arm64
         run: |
           set -euo pipefail
-          lipo -verify_arch "$ARCH" .build/InputRelay.app/Contents/MacOS/InputRelay
+          lipo .build/InputRelay.app/Contents/MacOS/InputRelay -verify_arch "$ARCH"
           codesign --verify --deep --strict .build/InputRelay.app
           mkdir -p dist
           ditto -c -k --sequesterRsrc --keepParent \
