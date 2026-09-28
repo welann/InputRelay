@@ -1,0 +1,110 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            arch: arm64
+          - runner: macos-15-intel
+            arch: x86_64
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prepare version
+        shell: bash
+        env:
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          if [[ "$REF_TYPE" == tag ]]; then
+            if [[ ! "$REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo 'Release tags must use vMAJOR.MINOR.PATCH, for example v1.0.0.' >&2
+              exit 1
+            fi
+            echo "INPUTRELAY_VERSION=${REF_NAME#v}" >> "$GITHUB_ENV"
+            echo "PACKAGE_VERSION=$REF_NAME" >> "$GITHUB_ENV"
+          else
+            echo "PACKAGE_VERSION=build-${GITHUB_SHA:0:7}" >> "$GITHUB_ENV"
+          fi
+          echo "INPUTRELAY_BUILD_NUMBER=$GITHUB_RUN_NUMBER" >> "$GITHUB_ENV"
+          swift --version
+          xcodebuild -version
+
+      - name: Test
+        run: swift test --disable-xctest
+
+      - name: Build application
+        run: ./build.sh release
+
+      - name: Package and verify
+        shell: bash
+        env:
+          ARCH: ${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+          lipo -verify_arch "$ARCH" .build/InputRelay.app/Contents/MacOS/InputRelay
+          codesign --verify --deep --strict .build/InputRelay.app
+          mkdir -p dist
+          ditto -c -k --sequesterRsrc --keepParent \
+            .build/InputRelay.app "dist/InputRelay-${PACKAGE_VERSION}-${ARCH}.zip"
+
+      - name: Upload build
+        uses: actions/upload-artifact@v4
+        with:
+          name: InputRelay-${{ matrix.arch }}
+          path: dist/*.zip
+          if-no-files-found: error
+          retention-days: 14
+
+  release:
+    name: Publish Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: InputRelay-*
+          path: dist
+          merge-multiple: true
+
+      - name: Publish packages
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          cd dist
+          sha256sum InputRelay-*.zip > SHA256SUMS.txt
+          if gh release view "$VERSION" >/dev/null 2>&1; then
+            gh release upload "$VERSION" InputRelay-*.zip SHA256SUMS.txt --clobber
+          else
+            gh release create "$VERSION" InputRelay-*.zip SHA256SUMS.txt \
+              --verify-tag --title "InputRelay $VERSION" --generate-notes \
+              --notes '下载 arm64 版本用于 Apple Silicon Mac，x86_64 版本用于 Intel Mac。解压后将 InputRelay.app 拖入“应用程序”。当前构建使用临时签名，尚未经过 Apple 公证，首次打开可能需要在系统设置的“隐私与安全性”中允许。'
+          fi

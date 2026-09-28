@@ -50,6 +50,15 @@
 - 辅助功能权限，用于模拟键盘和鼠标输入。
 - 从源码构建需要支持 Swift 6.0 的 Xcode Command Line Tools 或 Xcode。
 
+### 下载发行版
+
+前往 [Releases](https://github.com/welann/InputRelay/releases)，下载与 Mac 芯片对应的 ZIP：
+
+- **Apple Silicon（M 系列）**：`InputRelay-vX.Y.Z-arm64.zip`
+- **Intel**：`InputRelay-vX.Y.Z-x86_64.zip`
+
+解压后将 `InputRelay.app` 拖入“应用程序”。当前发行版使用临时签名，尚未经过 Apple 公证；若首次打开被 macOS 阻止，可在“系统设置 → 隐私与安全性”中查看并允许打开。
+
 ### 从源码构建
 
 ```bash
@@ -148,6 +157,22 @@ InputRelay 不会禁用原有键盘和鼠标。玩游戏时建议从菜单栏暂
 - [贡献指南](CONTRIBUTING.md)：参与开发的约定。
 
 欢迎通过 [Issues](https://github.com/welann/InputRelay/issues) 报告问题或提出建议，也欢迎提交 Pull Request。报告问题时请附上 macOS 版本、应用版本或提交号、手柄型号及连接模式，以及复现步骤。
+
+### 自动构建与发布
+
+[GitHub Actions](https://github.com/welann/InputRelay/actions/workflows/release.yml) 会在推送 `main`、提交面向 `main` 的 Pull Request 或手动运行时，执行测试并分别构建 Apple Silicon 和 Intel 版本。构建完成后，可在运行页面的 Artifacts 中下载 ZIP；这些临时产物保留 14 天。
+
+发布正式版本时，使用 `v主版本.次版本.修订号` 格式的标签，例如：
+
+```bash
+git push origin main
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+请将示例中的版本号替换为尚未使用的版本号。两个架构均测试和构建成功后，工作流会自动创建 GitHub Release，上传两个 ZIP 和 `SHA256SUMS.txt`，并生成发布说明。应用版本号自动取自标签，构建号使用 Actions 运行编号。重新运行同一标签的工作流会更新该 Release 的附件。
+
+工作流使用 GitHub 自带的 `GITHUB_TOKEN`，无需额外配置 Secrets。Developer ID 签名和 Apple 公证尚未接入。
 
 ## 许可证
 

@@ -47,6 +47,14 @@ cp "$BINARY" "$APP_BUNDLE/Contents/MacOS/$APP_NAME"
 cp "$ROOT/InputRelay/Resources/Info.plist" "$APP_BUNDLE/Contents/Info.plist"
 printf 'APPL????' > "$APP_BUNDLE/Contents/PkgInfo"
 
+# CI 发布时同步标签版本；必须在签名前写入。
+if [ -n "${INPUTRELAY_VERSION:-}" ]; then
+    /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $INPUTRELAY_VERSION" "$APP_BUNDLE/Contents/Info.plist"
+fi
+if [ -n "${INPUTRELAY_BUILD_NUMBER:-}" ]; then
+    /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $INPUTRELAY_BUILD_NUMBER" "$APP_BUNDLE/Contents/Info.plist"
+fi
+
 # 复制编译产物中的资源（预设配置等）
 for bundle in "$BIN_DIR"/*.bundle; do
     [ -e "$bundle" ] || continue
