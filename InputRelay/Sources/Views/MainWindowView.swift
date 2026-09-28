@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 struct MainWindowView: View {
@@ -11,10 +12,17 @@ struct MainWindowView: View {
         VStack(spacing: 0) {
             // 顶部标签栏
             HStack(spacing: 20) {
-                Label("InputRelay", systemImage: "gamecontroller.fill")
-                    .font(.system(size: 18, weight: .bold, design: .rounded))
-                    .foregroundStyle(AppTheme.text)
-                    .padding(.trailing, 16)
+                HStack(spacing: 7) {
+                    Image(nsImage: AppMark.image(size: 19))
+                        .resizable()
+                        .interpolation(.high)
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 19, height: 19)
+                    Text("InputRelay")
+                        .font(.system(size: 18, weight: .bold, design: .rounded))
+                        .foregroundStyle(AppTheme.text)
+                }
+                .padding(.trailing, 16)
                 TabButton(title: "配置管理", isSelected: selectedTab == 0) {
                     selectedTab = 0
                 }

@@ -58,6 +58,11 @@ if [ -f "$ROOT/InputRelay/Resources/AppIcon.icns" ]; then
     cp "$ROOT/InputRelay/Resources/AppIcon.icns" "$APP_BUNDLE/Contents/Resources/"
 fi
 
+# 品牌标识（窗口标题与菜单栏共用）
+if [ -f "$ROOT/InputRelay/Resources/fox-mark.png" ]; then
+    cp "$ROOT/InputRelay/Resources/fox-mark.png" "$APP_BUNDLE/Contents/Resources/"
+fi
+
 # 3. 有证书时保持相同签名身份；本地临时签名在重建后可能需要重新授权。
 codesign --force --deep --sign "$SIGNING_IDENTITY" "$APP_BUNDLE"
 codesign --verify --deep --strict "$APP_BUNDLE"

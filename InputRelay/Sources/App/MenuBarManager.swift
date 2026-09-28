@@ -50,8 +50,7 @@ final class MenuBarManager: NSObject {
     }
 
     private func icon(for state: IconState) -> NSImage? {
-        let name = state == .connected ? "gamecontroller.fill" : "gamecontroller"
-        return NSImage(systemSymbolName: name, accessibilityDescription: "InputRelay")
+        AppMark.statusImage(connected: state == .connected)
     }
 
     @objc private func gamepadConnectionChanged() {
