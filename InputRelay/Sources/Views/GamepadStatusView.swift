@@ -246,10 +246,10 @@ struct FaceButton: View {
         
         var hex: String {
             switch self {
-            case .red: return "#C43D3D"
-            case .green: return "#167348"
-            case .blue: return "#1765CC"
-            case .yellow: return "#986000"
+            case .red: return "#B04E3E"
+            case .green: return "#35754F"
+            case .blue: return "#516E90"
+            case .yellow: return "#8C6512"
             }
         }
     }
