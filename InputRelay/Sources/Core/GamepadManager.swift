@@ -20,7 +20,8 @@ final class GamepadManager: ObservableObject {
     private var controller: GCController?
     private var observations = Set<AnyCancellable>()
     private var eventHandler: ((GamepadEvent) -> Void)?
-    private var stickHandler: (() -> Void)?
+    private var stickHandler: ((TimeInterval) -> Void)?
+    private var lastStickTick: TimeInterval?
 
     init(controllers: @escaping () -> [GCController] = { GCController.controllers() }) {
         self.controllers = controllers
@@ -30,7 +31,7 @@ final class GamepadManager: ObservableObject {
         eventHandler = handler
     }
 
-    func setStickHandler(_ handler: @escaping () -> Void) {
+    func setStickHandler(_ handler: @escaping (TimeInterval) -> Void) {
         stickHandler = handler
     }
 
@@ -44,8 +45,8 @@ final class GamepadManager: ObservableObject {
                 .store(in: &observations)
         }
         refreshControllers()
-        // 固定采样频率使持续推住摇杆时仍能移动，且不随设备报告频率改变速度。
-        Timer.publish(every: 1.0 / 60.0, on: .main, in: .common).autoconnect()
+        // 提高输出频率；位移按单调时钟的实际间隔计算。
+        Timer.publish(every: 1.0 / 120.0, on: .main, in: .common).autoconnect()
             .sink { [weak self] _ in self?.sampleInput() }
             .store(in: &observations)
     }
@@ -68,7 +69,15 @@ final class GamepadManager: ObservableObject {
         NotificationCenter.default.post(name: Notification.Name("GamepadConnectionChanged"), object: nil)
     }
 
-    func sampleInput(advanceSticks: Bool = true) {
+    func sampleInput(advanceSticks: Bool = true, timestamp: TimeInterval = ProcessInfo.processInfo.systemUptime) {
+        let elapsed: TimeInterval
+        if advanceSticks {
+            // 长时间停顿后不追赶积压位移，避免唤醒或主线程阻塞后光标跳跃。
+            elapsed = min(max(timestamp - (lastStickTick ?? (timestamp - 1.0 / 120.0)), 0), 1.0 / 30.0)
+            lastStickTick = timestamp
+        } else {
+            elapsed = 0
+        }
         guard let pad = controller?.capture().extendedGamepad else { return }
         let inputs: [(GamepadButton, GCControllerButtonInput?)] = [
             (.buttonA, pad.buttonA), (.buttonB, pad.buttonB),
@@ -86,7 +95,7 @@ final class GamepadManager: ObservableObject {
         }
         updateStick(isLeft: true, x: pad.leftThumbstick.xAxis.value, y: pad.leftThumbstick.yAxis.value)
         updateStick(isLeft: false, x: pad.rightThumbstick.xAxis.value, y: pad.rightThumbstick.yAxis.value)
-        if advanceSticks && !isCapturingInput { stickHandler?() }
+        if advanceSticks && !isCapturingInput { stickHandler?(elapsed) }
     }
 
     private func updateButton(_ button: GamepadButton, value: Float) {
@@ -116,6 +125,7 @@ final class GamepadManager: ObservableObject {
     }
 
     private func resetInput() {
+        lastStickTick = nil
         for button in GamepadButton.allCases {
             updateButton(button, value: 0)
         }

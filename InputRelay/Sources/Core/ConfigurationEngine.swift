@@ -175,10 +175,15 @@ class ConfigurationEngine: ObservableObject {
         gamepadManager.setEventHandler { [weak self] event in
             self?.handleGamepadEvent(event)
         }
-        gamepadManager.setStickHandler { [weak self] in
-            guard let self, self.isEnabled, let profile = self.activeProfile else { return }
-            self.handleStickMovement(isLeftStick: true, settings: profile.stickSettings)
-            self.handleStickMovement(isLeftStick: false, settings: profile.stickSettings)
+        gamepadManager.setStickHandler { [weak self] elapsed in
+            guard let self else { return }
+            guard self.isEnabled, let profile = self.activeProfile else {
+                self.mouseSimulator.scroll(deltaY: 0)
+                return
+            }
+            let leftScroll = self.handleStickMovement(isLeftStick: true, settings: profile.stickSettings, elapsed: elapsed)
+            let rightScroll = self.handleStickMovement(isLeftStick: false, settings: profile.stickSettings, elapsed: elapsed)
+            self.mouseSimulator.scroll(deltaY: leftScroll + rightScroll)
         }
     }
     
@@ -199,10 +204,10 @@ class ConfigurationEngine: ObservableObject {
         executeAction(mapping.action)
     }
     
-    private func handleStickMovement(isLeftStick: Bool, settings: StickSettings) {
+    private func handleStickMovement(isLeftStick: Bool, settings: StickSettings, elapsed: TimeInterval) -> Double {
         let mode = isLeftStick ? settings.leftStickMode : settings.rightStickMode
         
-        guard mode != .disabled else { return }
+        guard mode != .disabled else { return 0 }
         
         // 摇杆是二维输入，必须同时取两个轴，否则斜向移动会退化成分轴抖动
         let axes = gamepadManager.getStickAxes(isLeft: isLeftStick)
@@ -214,16 +219,15 @@ class ConfigurationEngine: ObservableObject {
                 y: -y,
                 sensitivity: settings.sensitivity,
                 curve: settings.accelerationCurve,
-                deadzone: settings.deadzone
+                deadzone: settings.deadzone,
+                elapsed: elapsed
             )
         } else if mode == .scroll {
-            guard abs(y) > settings.deadzone else { return }
-            // GameController 的 Y 轴与滚轮都以向上为正。
-            let scrollAmount = Int32(y * settings.sensitivity * 10)
-            if abs(scrollAmount) > 0 {
-                mouseSimulator.scroll(deltaY: scrollAmount)
-            }
+            // 从死区边缘平滑起步，保留小数滚动量；GameController 的 Y 轴向上为正。
+            let amount = CurveCalculator.applyDeadzone(y, deadzone: settings.deadzone)
+            return Double(amount * settings.sensitivity) * 600 * elapsed
         }
+        return 0
     }
     
     private func executeAction(_ action: MappingAction) {

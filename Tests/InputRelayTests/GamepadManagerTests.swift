@@ -85,13 +85,31 @@ struct GamepadManagerTests {
         let (manager, pad) = fixture()
         var ticks = 0
         var presses = 0
-        manager.setStickHandler { ticks += 1 }
+        manager.setStickHandler { _ in ticks += 1 }
         manager.setEventHandler { if $0.button == .buttonA && $0.isPressed { presses += 1 } }
         pad.buttonA.setValue(1)
         pad.leftThumbstick.setValueForXAxis(1, yAxis: 0)
         for _ in 0..<5 { manager.sampleInput() }
         #expect(ticks == 5)
         #expect(presses == 1)
+    }
+
+    @Test func stickTimingUsesElapsedTimeAndIgnoresDeviceCallbacks() {
+        let (manager, _) = fixture()
+        var intervals: [TimeInterval] = []
+        manager.setStickHandler { intervals.append($0) }
+        manager.sampleInput(timestamp: 10)
+        manager.sampleInput(advanceSticks: false, timestamp: 10.004)
+        manager.sampleInput(timestamp: 10.01)
+        manager.isCapturingInput = true
+        manager.sampleInput(timestamp: 10.02)
+        manager.isCapturingInput = false
+        manager.sampleInput(timestamp: 10.03)
+        manager.sampleInput(timestamp: 20)
+        #expect(intervals.count == 4)
+        #expect(abs(intervals[1] - 0.01) < 0.000001)
+        #expect(abs(intervals[2] - 0.01) < 0.000001)
+        #expect(intervals[3] <= 1.0 / 30.0)
     }
 
     @Test func captureDoesNotReplaceMappingHandler() {
