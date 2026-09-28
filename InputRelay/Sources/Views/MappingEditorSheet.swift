@@ -4,34 +4,35 @@ import Carbon
 struct MappingEditorSheet: View {
     @Environment(\.dismiss) var dismiss
     let mapping: ButtonMapping?
+    let existingMappings: [ButtonMapping]
     @ObservedObject var gamepadManager: GamepadManager
-    let onSave: (ButtonMapping) -> Void
-    
-    @State private var selectedButton: GamepadButton
+    let onSave: (ButtonMapping, Bool) -> Bool
+
+    @State private var capture: MappingInputCapture
     @State private var actionType: ActionType = .keyboard
     @State private var keyCode: Int = kVK_Return
     @State private var modifiers: KeyboardShortcut.ModifierFlags = []
     @State private var mouseAction: MouseAction = .leftClick
-    @State private var customScript: String = ""
-    @State private var isWaitingForInput = false
-    
+    @State private var customScript = ""
+    @State private var showingReplaceAlert = false
+    @State private var saveRejected = false
+
     enum ActionType: String, CaseIterable {
         case keyboard = "键盘快捷键"
         case mouse = "鼠标操作"
         case script = "自定义脚本"
     }
-    
-    init(mapping: ButtonMapping?, gamepadManager: GamepadManager, onSave: @escaping (ButtonMapping) -> Void) {
+
+    init(mapping: ButtonMapping?, existingMappings: [ButtonMapping], gamepadManager: GamepadManager,
+         onSave: @escaping (ButtonMapping, Bool) -> Bool) {
         self.mapping = mapping
+        self.existingMappings = existingMappings
         self.gamepadManager = gamepadManager
         self.onSave = onSave
-        
-        if let mapping = mapping {
-            _selectedButton = State(initialValue: mapping.button)
-            
+        _capture = State(initialValue: MappingInputCapture(selectedButton: mapping?.button))
+        if let mapping {
             switch mapping.action {
             case .keyboardShortcut(let shortcut):
-                _actionType = State(initialValue: .keyboard)
                 _keyCode = State(initialValue: shortcut.keyCode)
                 _modifiers = State(initialValue: shortcut.modifiers)
             case .mouseAction(let action):
@@ -43,146 +44,157 @@ struct MappingEditorSheet: View {
             case .mouseMovement:
                 _actionType = State(initialValue: .mouse)
             }
-        } else {
-            _selectedButton = State(initialValue: .buttonA)
         }
     }
-    
+
+    private var conflicts: [ButtonMapping] {
+        existingMappings.filter { $0.button == capture.selectedButton && $0.id != mapping?.id }
+    }
+
     var body: some View {
-        VStack(spacing: 24) {
+        VStack(spacing: 20) {
             Text(mapping == nil ? "新建映射" : "编辑映射")
                 .font(.system(size: 20, weight: .semibold))
-                .foregroundColor(Color(hex: "#E5E7EB"))
-            
-            // 选择按键
-            VStack(alignment: .leading, spacing: 8) {
-                Text("手柄按键")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(Color(hex: "#9CA3AF"))
-                
-                if isWaitingForInput {
-                    HStack {
-                        ProgressView()
-                            .scaleEffect(0.7)
-                        Text("按下手柄上的任意按键...")
-                            .font(.system(size: 13))
-                            .foregroundColor(Color(hex: "#38BDF8"))
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color(hex: "#0F131C"))
-                    .cornerRadius(8)
-                } else {
-                    Button(action: startWaitingForInput) {
-                        HStack {
-                            Text(selectedButton.displayName)
-                                .font(.system(size: 14, weight: .medium, design: .monospaced))
-                                .foregroundColor(Color(hex: "#E5E7EB"))
-                            Spacer()
-                            Image(systemName: "gamecontroller")
-                                .foregroundColor(Color(hex: "#38BDF8"))
+                .foregroundStyle(AppTheme.text)
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("手柄按键")
+                            .font(.system(size: 13, weight: .medium))
+                        HStack(spacing: 12) {
+                            Image(systemName: capture.isWaiting ? "gamecontroller" : "checkmark.circle")
+                                .font(.system(size: 24))
+                                .foregroundStyle(AppTheme.accent)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(capture.isWaiting ? (gamepadManager.isConnected ? "请按下要绑定的手柄按键" : "请连接手柄，然后按下要绑定的按键") : (capture.selectedButton.map { "已选择 \($0.displayName)" } ?? "尚未选择按键"))
+                                    .font(.system(size: 14, weight: .semibold))
+                                Text("一次按一个键；已按住的键请先松开再按。")
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(AppTheme.secondary)
+                            }
+                            Spacer(minLength: 0)
                         }
-                        .padding()
-                        .background(Color(hex: "#0F131C"))
-                        .cornerRadius(8)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(14)
+                        .background(AppTheme.inset)
+                        .cornerRadius(10)
+
+                        HStack {
+                            Button(capture.isWaiting ? "停止识别" : "重新识别") {
+                                if capture.isWaiting { capture.stop() } else { startWaitingForInput() }
+                            }
+                            Menu("手动选择") {
+                                ForEach(GamepadButton.allCases.filter { !$0.isStickAxis }, id: \.self) { button in
+                                    Button(button.displayName) { capture.select(button) }
+                                }
+                            }
+                        }
+                        Text("编辑期间暂停手柄控制，避免触发已有操作。摇杆方向请在“摇杆设置”中配置。")
+                            .font(.system(size: 12))
+                            .foregroundStyle(AppTheme.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+
+                        if capture.selectedButton == .homeButton {
+                            Text("Xbox 键可能被系统保留，无法保证触发自定义操作。")
+                                .font(.system(size: 12))
+                                .foregroundStyle(AppTheme.warning)
+                        }
+                        if capture.selectedButton?.isStickAxis == true {
+                            Text("此旧映射使用摇杆方向，请重新选择实体按键；摇杆行为在“摇杆设置”中调整。")
+                                .font(.system(size: 12))
+                                .foregroundStyle(AppTheme.warning)
+                        }
+                        if !conflicts.isEmpty {
+                            VStack(alignment: .leading, spacing: 6) {
+                                Label("此按键在当前配置中已有绑定", systemImage: "exclamationmark.triangle")
+                                    .font(.system(size: 13, weight: .medium))
+                                ForEach(conflicts) { conflict in
+                                    Text("\(conflict.button.displayName) → \(conflict.action.displayName)\(conflict.enabled ? "" : "（已禁用）")")
+                                        .font(.system(size: 12))
+                                }
+                                Text("可以重新选键，或在保存时确认替换。其他配置不受影响。")
+                                    .font(.system(size: 12))
+                            }
+                            .foregroundStyle(AppTheme.warning)
+                            .padding(12)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(AppTheme.warning.opacity(0.08))
+                            .cornerRadius(8)
+                        }
                     }
-                    .buttonStyle(PlainButtonStyle())
-                }
-            }
-            
-            Divider()
-                .background(Color(hex: "#1E2636"))
-            
-            // 选择动作类型
-            VStack(alignment: .leading, spacing: 8) {
-                Text("映射动作")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(Color(hex: "#9CA3AF"))
-                
-                Picker("", selection: $actionType) {
-                    ForEach(ActionType.allCases, id: \.self) { type in
-                        Text(type.rawValue).tag(type)
+
+                    Divider()
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("映射动作")
+                            .font(.system(size: 13, weight: .medium))
+                        Picker("映射动作", selection: $actionType) {
+                            ForEach(ActionType.allCases, id: \.self) { type in
+                                Text(type.rawValue).tag(type)
+                            }
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.segmented)
+                    }
+                    switch actionType {
+                    case .keyboard: KeyboardShortcutEditor(keyCode: $keyCode, modifiers: $modifiers)
+                    case .mouse: MouseActionEditor(action: $mouseAction)
+                    case .script: CustomScriptEditor(script: $customScript)
+                    }
+                    if saveRejected {
+                        Text("绑定发生冲突，未保存。请重新选键或确认替换。")
+                            .foregroundStyle(AppTheme.warning)
                     }
                 }
-                .pickerStyle(SegmentedPickerStyle())
             }
-            
-            // 动作配置
-            Group {
-                switch actionType {
-                case .keyboard:
-                    KeyboardShortcutEditor(keyCode: $keyCode, modifiers: $modifiers)
-                case .mouse:
-                    MouseActionEditor(action: $mouseAction)
-                case .script:
-                    CustomScriptEditor(script: $customScript)
-                }
-            }
-            
-            Spacer()
-            
-            // 按钮
+
             HStack(spacing: 12) {
-                Button("取消") {
-                    dismiss()
-                }
-                .keyboardShortcut(.escape)
-                
-                Button("保存") {
-                    saveMapping()
-                }
-                .keyboardShortcut(.return)
+                Button("取消") { dismiss() }
+                    .keyboardShortcut(.escape)
+                Spacer()
+                Button(conflicts.isEmpty ? "保存" : "替换并保存…") { saveMapping() }
+                    .keyboardShortcut(.return)
+                    .disabled(capture.isWaiting || capture.selectedButton == nil || capture.selectedButton?.isStickAxis == true)
             }
         }
         .padding(24)
-        .frame(width: 500, height: 450)
-        .background(Color(hex: "#0A0D12"))
+        .frame(width: 540, height: 620)
+        .foregroundStyle(AppTheme.text)
+        .background(AppTheme.surface)
         .onAppear {
-            setupGamepadListener()
+            gamepadManager.isCapturingInput = true
+            if mapping == nil { startWaitingForInput() }
+        }
+        .onDisappear { gamepadManager.isCapturingInput = false }
+        .onReceive(gamepadManager.inputEvents) { capture.receive($0) }
+        .alert("替换已有绑定？", isPresented: $showingReplaceAlert) {
+            Button("返回选键", role: .cancel) { startWaitingForInput() }
+            Button("替换并保存", role: .destructive) { saveMapping(replace: true) }
+        } message: {
+            Text("将替换当前配置中 \(capture.selectedButton?.displayName ?? "") 的 \(conflicts.count) 条已有绑定。同一按键只执行新操作。")
         }
     }
-    
-    private func setupGamepadListener() {
-        gamepadManager.setEventHandler { [self] event in
-            if isWaitingForInput && event.isPressed {
-                DispatchQueue.main.async {
-                    self.selectedButton = event.button
-                    self.isWaitingForInput = false
-                }
-            }
-        }
-    }
-    
+
     private func startWaitingForInput() {
-        isWaitingForInput = true
-        DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
-            if isWaitingForInput {
-                isWaitingForInput = false
-            }
-        }
+        capture.begin(heldButtons: Set(gamepadManager.buttonStates.filter { $0.value > 0.5 }.map(\.key)))
+        saveRejected = false
     }
-    
-    private func saveMapping() {
-        let action: MappingAction
-        
-        switch actionType {
-        case .keyboard:
-            action = .keyboardShortcut(KeyboardShortcut(keyCode: keyCode, modifiers: modifiers))
-        case .mouse:
-            action = .mouseAction(mouseAction)
-        case .script:
-            action = .customScript(customScript)
+
+    private func saveMapping(replace: Bool = false) {
+        guard !capture.isWaiting, let button = capture.selectedButton, !button.isStickAxis else { return }
+        if !conflicts.isEmpty && !replace {
+            showingReplaceAlert = true
+            return
         }
-        
-        let newMapping = ButtonMapping(
-            id: mapping?.id ?? UUID(),
-            button: selectedButton,
-            action: action,
-            enabled: mapping?.enabled ?? true
-        )
-        
-        onSave(newMapping)
-        dismiss()
+        let action: MappingAction
+        switch actionType {
+        case .keyboard: action = .keyboardShortcut(KeyboardShortcut(keyCode: keyCode, modifiers: modifiers))
+        case .mouse: action = .mouseAction(mouseAction)
+        case .script: action = .customScript(customScript)
+        }
+        let newMapping = ButtonMapping(id: mapping?.id ?? UUID(), button: button,
+                                       action: action, enabled: mapping?.enabled ?? true)
+        if onSave(newMapping, replace) { dismiss() } else { saveRejected = true }
     }
 }
 
@@ -212,7 +224,7 @@ struct KeyboardShortcutEditor: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text("按键")
                     .font(.system(size: 12))
-                    .foregroundColor(Color(hex: "#6B7280"))
+                    .foregroundColor(AppTheme.muted)
                 
                 Picker("", selection: $keyCode) {
                     ForEach(commonKeys, id: \.value) { key in
@@ -224,7 +236,7 @@ struct KeyboardShortcutEditor: View {
             }
         }
         .padding()
-        .background(Color(hex: "#0F131C"))
+        .background(AppTheme.inset)
         .cornerRadius(8)
     }
     
@@ -254,9 +266,9 @@ struct ModifierButton: View {
         Button(action: action) {
             Text(title)
                 .font(.system(size: 20, weight: .medium))
-                .foregroundColor(isActive ? Color(hex: "#05070C") : Color(hex: "#9CA3AF"))
+                .foregroundColor(isActive ? AppTheme.onAccent : AppTheme.secondary)
                 .frame(width: 44, height: 44)
-                .background(isActive ? Color(hex: "#38BDF8") : Color(hex: "#161D2B"))
+                .background(isActive ? AppTheme.accent : AppTheme.selection)
                 .cornerRadius(8)
         }
         .buttonStyle(PlainButtonStyle())
@@ -272,21 +284,21 @@ struct MouseActionEditor: View {
                 Button(action: { action = mouseAction }) {
                     HStack {
                         Image(systemName: action == mouseAction ? "circle.fill" : "circle")
-                            .foregroundColor(Color(hex: "#38BDF8"))
+                            .foregroundColor(AppTheme.accent)
                         Text(mouseAction.rawValue)
                             .font(.system(size: 14))
-                            .foregroundColor(Color(hex: "#E5E7EB"))
+                            .foregroundColor(AppTheme.text)
                         Spacer()
                     }
                     .padding(12)
-                    .background(action == mouseAction ? Color(hex: "#161D2B") : Color.clear)
+                    .background(action == mouseAction ? AppTheme.selection : Color.clear)
                     .cornerRadius(8)
                 }
                 .buttonStyle(PlainButtonStyle())
             }
         }
         .padding()
-        .background(Color(hex: "#0F131C"))
+        .background(AppTheme.inset)
         .cornerRadius(8)
     }
 }
@@ -298,18 +310,18 @@ struct CustomScriptEditor: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Shell 命令")
                 .font(.system(size: 12))
-                .foregroundColor(Color(hex: "#6B7280"))
+                .foregroundColor(AppTheme.muted)
             
             TextEditor(text: $script)
                 .font(.system(size: 13, design: .monospaced))
-                .foregroundColor(Color(hex: "#E5E7EB"))
+                .foregroundColor(AppTheme.text)
                 .frame(height: 100)
                 .padding(8)
-                .background(Color(hex: "#05070C"))
+                .background(AppTheme.background)
                 .cornerRadius(6)
         }
         .padding()
-        .background(Color(hex: "#0F131C"))
+        .background(AppTheme.inset)
         .cornerRadius(8)
     }
 }

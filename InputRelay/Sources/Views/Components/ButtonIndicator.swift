@@ -24,20 +24,20 @@ struct ButtonIndicator: View {
                 .fill(backgroundColor)
                 .frame(width: size, height: size)
             
-            // 外发光效果（按下时）
-            if isPressed {
-                Circle()
-                    .stroke(accentColor, lineWidth: 2)
-                    .blur(radius: 4)
-                    .frame(width: size + 8, height: size + 8)
-            }
-            
             // 按键标签
             Text(label)
                 .font(.system(size: size >= 56 ? 12 : 16, weight: .semibold, design: .rounded))
                 .foregroundStyle(textColor)
         }
-        .scaleEffect(isPressed ? 1.1 : (isHovered ? 1.05 : 1.0))
+        .frame(width: size, height: size)
+        .overlay {
+            Circle()
+                .stroke(accentColor, lineWidth: 2)
+                .blur(radius: 4)
+                .frame(width: size + 8, height: size + 8)
+                .opacity(isPressed ? 1 : 0)
+        }
+        .scaleEffect(isHovered ? 1.05 : 1.0)
         .animation(.spring(response: 0.2, dampingFraction: 0.6), value: isPressed)
         .animation(.easeOut(duration: 0.15), value: isHovered)
         .onHover { hovering in
@@ -51,22 +51,22 @@ struct ButtonIndicator: View {
     
     private var backgroundColor: Color {
         if isPressed {
-            return Color(red: 0.22, green: 0.73, blue: 0.97)
+            return AppTheme.accent
         } else {
-            return Color(red: 0.09, green: 0.11, blue: 0.17)
+            return AppTheme.inset
         }
     }
     
     private var textColor: Color {
         if isPressed {
-            return Color(red: 0.02, green: 0.03, blue: 0.05)
+            return AppTheme.onAccent
         } else {
-            return Color(red: 0.90, green: 0.91, blue: 0.92)
+            return AppTheme.text
         }
     }
     
     private var accentColor: Color {
-        Color(red: 0.22, green: 0.73, blue: 0.97)
+        AppTheme.accent
     }
 }
 
@@ -85,7 +85,7 @@ struct StickIndicator: View {
             ZStack {
                 // 外圈
                 Circle()
-                    .stroke(Color(red: 0.42, green: 0.45, blue: 0.50), lineWidth: 2)
+                    .stroke(AppTheme.border, lineWidth: 2)
                     .frame(width: 80, height: 80)
                 
                 // 十字线
@@ -95,7 +95,7 @@ struct StickIndicator: View {
                     path.move(to: CGPoint(x: 0, y: 40))
                     path.addLine(to: CGPoint(x: 80, y: 40))
                 }
-                .stroke(Color(red: 0.42, green: 0.45, blue: 0.50).opacity(0.3), lineWidth: 1)
+                .stroke(AppTheme.border, lineWidth: 1)
                 .frame(width: 80, height: 80)
                 
                 // 当前位置指示点
@@ -125,7 +125,7 @@ struct StickIndicator: View {
             
             Text(label)
                 .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(Color(red: 0.61, green: 0.64, blue: 0.69))
+                .foregroundStyle(AppTheme.secondary)
         }
         .onHover { hovering in
             isHovered = hovering
@@ -141,10 +141,10 @@ struct StickIndicator: View {
     }
     
     private var activeColor: Color {
-        Color(red: 0.22, green: 0.73, blue: 0.97)
+        AppTheme.accent
     }
     
     private var inactiveColor: Color {
-        Color(red: 0.42, green: 0.45, blue: 0.50)
+        AppTheme.muted
     }
 }

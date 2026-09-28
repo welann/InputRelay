@@ -25,6 +25,11 @@ let package = Package(
             resources: [
                 .process("Resources/Presets")
             ]
+        ),
+        .testTarget(
+            name: "InputRelayTests",
+            dependencies: ["InputRelay"],
+            path: "Tests/InputRelayTests"
         )
     ]
 )

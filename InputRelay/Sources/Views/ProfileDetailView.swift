@@ -7,9 +7,13 @@ struct ProfileDetailView: View {
     let onDelete: () -> Void
     
     @State private var editingProfile: Profile
-    @State private var showingMappingEditor = false
-    @State private var editingMapping: ButtonMapping?
+    @State private var editorSession: MappingEditorSession?
     @State private var showingDeleteAlert = false
+
+    private struct MappingEditorSession: Identifiable {
+        let id = UUID()
+        let mapping: ButtonMapping?
+    }
     
     init(profile: Profile, gamepadManager: GamepadManager, onUpdate: @escaping (Profile) -> Void, onDelete: @escaping () -> Void) {
         self.profile = profile
@@ -26,14 +30,14 @@ struct ProfileDetailView: View {
                 HStack {
                     TextField("配置名称", text: $editingProfile.name)
                         .font(.system(size: 24, weight: .bold))
-                        .foregroundColor(Color(hex: "#E5E7EB"))
+                        .foregroundColor(AppTheme.text)
                         .textFieldStyle(PlainTextFieldStyle())
                     
                     Spacer()
                     
                     Button(action: { showingDeleteAlert = true }) {
                         Image(systemName: "trash")
-                            .foregroundColor(Color(hex: "#EF4444"))
+                            .foregroundColor(AppTheme.danger)
                     }
                     .buttonStyle(PlainButtonStyle())
                 }
@@ -42,14 +46,14 @@ struct ProfileDetailView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("应用匹配规则")
                         .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(Color(hex: "#9CA3AF"))
+                        .foregroundColor(AppTheme.secondary)
                     
                     VStack(alignment: .leading, spacing: 8) {
                         ForEach(editingProfile.appRules.indices, id: \.self) { index in
                             HStack {
                                 Text(editingProfile.appRules[index].displayString)
                                     .font(.system(size: 13))
-                                    .foregroundColor(Color(hex: "#E5E7EB"))
+                                    .foregroundColor(AppTheme.text)
                                 
                                 Spacer()
                                 
@@ -58,12 +62,12 @@ struct ProfileDetailView: View {
                                     saveChanges()
                                 }) {
                                     Image(systemName: "xmark.circle.fill")
-                                        .foregroundColor(Color(hex: "#6B7280"))
+                                        .foregroundColor(AppTheme.muted)
                                 }
                                 .buttonStyle(PlainButtonStyle())
                             }
                             .padding(10)
-                            .background(Color(hex: "#0F131C"))
+                            .background(AppTheme.inset)
                             .cornerRadius(6)
                         }
                         
@@ -73,13 +77,13 @@ struct ProfileDetailView: View {
                                 Text("添加规则")
                             }
                             .font(.system(size: 13))
-                            .foregroundColor(Color(hex: "#38BDF8"))
+                            .foregroundColor(AppTheme.accent)
                         }
                         .buttonStyle(PlainButtonStyle())
                     }
                 }
                 .padding()
-                .background(Color(hex: "#0A0D12"))
+                .background(AppTheme.surface)
                 .cornerRadius(12)
                 
                 // 摇杆设置
@@ -90,17 +94,19 @@ struct ProfileDetailView: View {
                     HStack {
                         Text("按键映射")
                             .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(Color(hex: "#9CA3AF"))
+                            .foregroundColor(AppTheme.secondary)
                         
                         Spacer()
                         
-                        Button(action: { showingMappingEditor = true }) {
+                        Button(action: {
+                            editorSession = MappingEditorSession(mapping: nil)
+                        }) {
                             HStack(spacing: 4) {
                                 Image(systemName: "plus.circle.fill")
                                 Text("添加映射")
                             }
                             .font(.system(size: 13))
-                            .foregroundColor(Color(hex: "#38BDF8"))
+                            .foregroundColor(AppTheme.accent)
                         }
                         .buttonStyle(PlainButtonStyle())
                     }
@@ -108,14 +114,13 @@ struct ProfileDetailView: View {
                     if editingProfile.mappings.isEmpty {
                         Text("暂无映射，点击上方按钮添加")
                             .font(.system(size: 13))
-                            .foregroundColor(Color(hex: "#6B7280"))
+                            .foregroundColor(AppTheme.muted)
                             .padding()
                     } else {
                         VStack(spacing: 8) {
                             ForEach(editingProfile.mappings) { mapping in
                                 MappingRow(mapping: mapping) {
-                                    editingMapping = mapping
-                                    showingMappingEditor = true
+                                    editorSession = MappingEditorSession(mapping: mapping)
                                 } onToggle: {
                                     toggleMapping(mapping)
                                 } onDelete: {
@@ -126,24 +131,21 @@ struct ProfileDetailView: View {
                     }
                 }
                 .padding()
-                .background(Color(hex: "#0A0D12"))
+                .background(AppTheme.surface)
                 .cornerRadius(12)
             }
             .padding()
         }
-        .background(Color(hex: "#05070C"))
-        .sheet(isPresented: $showingMappingEditor) {
+        .background(AppTheme.background)
+        .sheet(item: $editorSession) { session in
             MappingEditorSheet(
-                mapping: editingMapping,
+                mapping: session.mapping,
+                existingMappings: editingProfile.mappings,
                 gamepadManager: gamepadManager,
-                onSave: { newMapping in
-                    if let index = editingProfile.mappings.firstIndex(where: { $0.id == newMapping.id }) {
-                        editingProfile.mappings[index] = newMapping
-                    } else {
-                        editingProfile.mappings.append(newMapping)
-                    }
+                onSave: { newMapping, replace in
+                    guard editingProfile.storeMapping(newMapping, replacingConflicts: replace) else { return false }
                     saveChanges()
-                    editingMapping = nil
+                    return true
                 }
             )
         }
@@ -194,17 +196,17 @@ struct MappingRow: View {
             // 按键名称
             Text(mapping.button.displayName)
                 .font(.system(size: 13, weight: .medium, design: .monospaced))
-                .foregroundColor(Color(hex: "#38BDF8"))
+                .foregroundColor(AppTheme.accent)
                 .frame(width: 60, alignment: .leading)
             
             Image(systemName: "arrow.right")
                 .font(.system(size: 10))
-                .foregroundColor(Color(hex: "#6B7280"))
+                .foregroundColor(AppTheme.muted)
             
             // 映射动作
-            Text(actionDescription)
+            Text(mapping.action.displayName)
                 .font(.system(size: 13))
-                .foregroundColor(Color(hex: "#E5E7EB"))
+                .foregroundColor(AppTheme.text)
             
             Spacer()
             
@@ -213,41 +215,29 @@ struct MappingRow: View {
                 get: { mapping.enabled },
                 set: { _ in onToggle() }
             ))
-            .toggleStyle(SwitchToggleStyle(tint: Color(hex: "#38BDF8")))
+            .toggleStyle(SwitchToggleStyle(tint: AppTheme.accent))
             .labelsHidden()
             
             // 编辑
             Button(action: onEdit) {
                 Image(systemName: "pencil")
-                    .foregroundColor(Color(hex: "#9CA3AF"))
+                    .foregroundColor(AppTheme.secondary)
             }
             .buttonStyle(PlainButtonStyle())
             
             // 删除
             Button(action: onDelete) {
                 Image(systemName: "trash")
-                    .foregroundColor(Color(hex: "#EF4444"))
+                    .foregroundColor(AppTheme.danger)
             }
             .buttonStyle(PlainButtonStyle())
         }
         .padding(12)
-        .background(Color(hex: "#0F131C"))
+        .background(AppTheme.inset)
         .cornerRadius(8)
         .opacity(mapping.enabled ? 1.0 : 0.5)
     }
     
-    private var actionDescription: String {
-        switch mapping.action {
-        case .keyboardShortcut(let shortcut):
-            return shortcut.displayString
-        case .mouseAction(let action):
-            return action.rawValue
-        case .customScript(let script):
-            return "脚本: \(script.prefix(30))..."
-        case .mouseMovement(let axis, _):
-            return "鼠标\(axis == .horizontal ? "水平" : "垂直")移动"
-        }
-    }
 }
 
 struct StickSettingsSection: View {
@@ -258,14 +248,14 @@ struct StickSettingsSection: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("摇杆设置")
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundColor(Color(hex: "#9CA3AF"))
+                .foregroundColor(AppTheme.secondary)
             
             VStack(spacing: 16) {
                 // 左摇杆模式
                 HStack {
                     Text("左摇杆")
                         .font(.system(size: 13))
-                        .foregroundColor(Color(hex: "#E5E7EB"))
+                        .foregroundColor(AppTheme.text)
                         .frame(width: 80, alignment: .leading)
                     
                     Picker("", selection: $settings.leftStickMode) {
@@ -281,7 +271,7 @@ struct StickSettingsSection: View {
                 HStack {
                     Text("右摇杆")
                         .font(.system(size: 13))
-                        .foregroundColor(Color(hex: "#E5E7EB"))
+                        .foregroundColor(AppTheme.text)
                         .frame(width: 80, alignment: .leading)
                     
                     Picker("", selection: $settings.rightStickMode) {
@@ -298,11 +288,11 @@ struct StickSettingsSection: View {
                     HStack {
                         Text("灵敏度")
                             .font(.system(size: 13))
-                            .foregroundColor(Color(hex: "#E5E7EB"))
+                            .foregroundColor(AppTheme.text)
                         Spacer()
                         Text(String(format: "%.1f", settings.sensitivity))
                             .font(.system(size: 12, design: .monospaced))
-                            .foregroundColor(Color(hex: "#9CA3AF"))
+                            .foregroundColor(AppTheme.secondary)
                     }
                     Slider(value: $settings.sensitivity, in: 0.1...5.0, step: 0.1)
                         .onChange(of: settings.sensitivity) { onChange() }
@@ -313,11 +303,11 @@ struct StickSettingsSection: View {
                     HStack {
                         Text("死区")
                             .font(.system(size: 13))
-                            .foregroundColor(Color(hex: "#E5E7EB"))
+                            .foregroundColor(AppTheme.text)
                         Spacer()
                         Text(String(format: "%.2f", settings.deadzone))
                             .font(.system(size: 12, design: .monospaced))
-                            .foregroundColor(Color(hex: "#9CA3AF"))
+                            .foregroundColor(AppTheme.secondary)
                     }
                     Slider(value: $settings.deadzone, in: 0.0...0.5, step: 0.01)
                         .onChange(of: settings.deadzone) { onChange() }
@@ -327,7 +317,7 @@ struct StickSettingsSection: View {
                 HStack {
                     Text("加速曲线")
                         .font(.system(size: 13))
-                        .foregroundColor(Color(hex: "#E5E7EB"))
+                        .foregroundColor(AppTheme.text)
                         .frame(width: 80, alignment: .leading)
                     
                     Picker("", selection: $settings.accelerationCurve) {
@@ -341,7 +331,7 @@ struct StickSettingsSection: View {
             }
         }
         .padding()
-        .background(Color(hex: "#0A0D12"))
+        .background(AppTheme.surface)
         .cornerRadius(12)
     }
 }

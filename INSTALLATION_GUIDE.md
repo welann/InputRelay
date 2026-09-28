@@ -7,7 +7,7 @@
   - 冰原狼 4 代
   - Xbox 系列手柄
   - PlayStation DualShock / DualSense
-  - 其他标准 HID 游戏手柄
+  - macOS GameController 可识别的其他扩展游戏手柄
 
 ## 🚀 安装方式
 
@@ -60,7 +60,7 @@ swift --version
 
 ### 1. 授予辅助功能权限（必需）
 
-InputRelay 首次启动时会自动引导你授权：
+InputRelay 启动时直接显示浅色主窗口，窗口内提示尚未授予的权限：
 
 1. 点击"打开系统设置"按钮
 2. 系统设置会自动跳转到"隐私与安全性"
@@ -74,15 +74,17 @@ InputRelay 首次启动时会自动引导你授权：
 3. 点击左下角的锁图标解锁
 4. 点击 "+" 按钮
 5. 找到并添加 InputRelay
-6. 确保其开关处于打开状态
+6. 确保其开关处于打开状态；应用会每秒刷新，切回窗口时也会重新检测
+
+若系统设置已开启而应用仍显示未授权，请在“高级设置”点击“定位当前应用”，确认授权的是正在运行的 `.app`。重新构建或替换临时签名应用后，移除旧条目并重新添加，再重启 InputRelay。无需额外授予输入监控权限来读取标准手柄。
 
 > ⚠️ **重要**: InputRelay 必须获得辅助功能权限才能模拟键盘和鼠标操作。没有此权限，应用无法正常工作。
 
 ### 2. 连接手柄
 
 1. 通过蓝牙或 USB 连接你的游戏手柄
-2. InputRelay 菜单栏图标会从灰色变为彩色，表示检测到手柄
-3. 点击图标查看当前状态和配置
+2. 打开主窗口的“手柄状态”，检查设备名称和按键反馈
+3. 多模式设备请选择 Xbox / XInput 模式；按键显示为 LB / RB、LT / RT、View / Menu
 
 ### 3. 选择或创建配置
 
@@ -103,7 +105,7 @@ InputRelay 预置了两个配置：
 
 ### 快速开始
 
-1. 启动 InputRelay（会在菜单栏显示图标）
+1. 启动 InputRelay（直接显示主窗口，并保留 Dock 和菜单栏入口）
 2. 连接手柄（图标变为彩色）
 3. 手柄输入会自动转换为键盘/鼠标操作
 
@@ -214,3 +216,17 @@ InputRelay 会在启动时检查新版本（需要网络连接）。
 **注意**: 如果重新构建后辅助功能权限失效，需要：
 1. 在系统设置中移除旧的 InputRelay 条目
 2. 重新添加新构建的版本
+
+### 稳定签名与 SDK 选择
+
+默认使用本地 ad-hoc 签名。若已有代码签名证书，可在构建时指定同一签名身份，减少更新后重新授权的问题：
+
+```bash
+CODE_SIGN_IDENTITY="你的代码签名证书名称" ./build.sh release
+```
+
+如果当前 Command Line Tools 的 macOS 27 SDK 缺少 `SwiftUIMacros` 插件，可以使用已安装的 macOS 26.5 SDK：
+
+```bash
+INPUTRELAY_SDK=/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk ./build.sh release
+```

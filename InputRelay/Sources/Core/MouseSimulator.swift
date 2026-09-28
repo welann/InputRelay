@@ -5,39 +5,40 @@ import CoreGraphics
 /// 鼠标模拟器 - 负责模拟鼠标移动和点击
 class MouseSimulator {
     private var currentPosition: CGPoint = .zero
-    private var lastUpdateTime: TimeInterval = 0
+    private let cursorLocation: () -> CGPoint?
+    private let displayBounds: () -> [CGRect]
+    private let postEvent: (CGEvent) -> Void
     
-    init() {
-        // 获取当前鼠标位置
-        if let event = CGEvent(source: nil) {
-            currentPosition = event.location
-        }
+    init(
+        cursorLocation: @escaping () -> CGPoint? = { CGEvent(source: nil)?.location },
+        displayBounds: @escaping () -> [CGRect] = { DesktopGeometry.activeDisplayBounds() },
+        postEvent: @escaping (CGEvent) -> Void = { $0.post(tap: .cghidEventTap) }
+    ) {
+        self.cursorLocation = cursorLocation
+        self.displayBounds = displayBounds
+        self.postEvent = postEvent
+        currentPosition = cursorLocation() ?? .zero
     }
     
     /// 移动鼠标（相对移动）
     func moveMouse(dx: CGFloat, dy: CGFloat) {
-        currentPosition.x += dx
-        currentPosition.y += dy
-        
-        // 限制在屏幕范围内，避免指针漂移到屏幕外后失去响应
-        if let screen = NSScreen.main ?? NSScreen.screens.first {
-            let frame = screen.frame
-            currentPosition.x = max(0, min(currentPosition.x, frame.width))
-            currentPosition.y = max(0, min(currentPosition.y, frame.height))
-        }
+        let origin = cursorLocation() ?? currentPosition
+        let proposed = CGPoint(x: origin.x + dx, y: origin.y + dy)
+        currentPosition = DesktopGeometry.constrain(proposed, to: displayBounds())
         
         // 创建鼠标移动事件
         if let event = CGEvent(mouseEventSource: nil,
                               mouseType: .mouseMoved,
                               mouseCursorPosition: currentPosition,
                               mouseButton: .left) {
-            event.post(tap: CGEventTapLocation.cghidEventTap)
+            postEvent(event)
         }
     }
     
     /// 模拟鼠标点击
     func click(_ button: CGMouseButton, at position: CGPoint? = nil) {
-        let pos = position ?? currentPosition
+        let pos = position ?? cursorLocation() ?? currentPosition
+        currentPosition = pos
         
         let downType: CGEventType
         let upType: CGEventType
@@ -61,7 +62,7 @@ class MouseSimulator {
                                    mouseType: downType,
                                    mouseCursorPosition: pos,
                                    mouseButton: button) {
-            downEvent.post(tap: .cghidEventTap)
+            postEvent(downEvent)
         }
         
         // 短暂延迟
@@ -72,7 +73,7 @@ class MouseSimulator {
                                 mouseType: upType,
                                 mouseCursorPosition: pos,
                                 mouseButton: button) {
-            upEvent.post(tap: .cghidEventTap)
+            postEvent(upEvent)
         }
     }
     
@@ -85,7 +86,7 @@ class MouseSimulator {
                               wheel1: deltaY,
                               wheel2: 0,
                               wheel3: 0) {
-            event.post(tap: .cghidEventTap)
+            postEvent(event)
         }
     }
     
@@ -108,11 +109,7 @@ class MouseSimulator {
         let dx = CGFloat(normalizedX * curvedMagnitude) * baseSpeed * CGFloat(sensitivity)
         let dy = CGFloat(normalizedY * curvedMagnitude) * baseSpeed * CGFloat(sensitivity)
         
-        // 限制更新频率（60 FPS）
-        let now = Date().timeIntervalSince1970
-        if now - lastUpdateTime >= 1.0 / 60.0 {
-            moveMouse(dx: dx, dy: dy)
-            lastUpdateTime = now
-        }
+        // GamepadManager 已按 60 Hz 驱动，避免再次限频丢帧。
+        moveMouse(dx: dx, dy: dy)
     }
 }

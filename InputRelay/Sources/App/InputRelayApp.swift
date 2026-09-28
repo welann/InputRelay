@@ -28,13 +28,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     )
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // 不显示 Dock 图标，仅作为菜单栏应用运行
-        NSApp.setActivationPolicy(.accessory)
-
-        // 检查权限
-        if !permissionManager.allPermissionsGranted {
-            showPermissionAlert()
-        }
+        NSApp.setActivationPolicy(.regular)
+        permissionManager.startMonitoring()
 
         // 配置引擎需要先初始化，以加载并激活默认配置
         _ = configEngine
@@ -47,19 +42,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         manager.setup()
         menuBarManager = manager
+        manager.openSettings()
     }
 
-    private func showPermissionAlert() {
-        let alert = NSAlert()
-        alert.messageText = "需要辅助功能权限"
-        alert.informativeText = "InputRelay 需要辅助功能权限才能模拟键盘和鼠标操作。请在系统设置中授予权限。"
-        alert.alertStyle = .warning
-        alert.addButton(withTitle: "打开系统设置")
-        alert.addButton(withTitle: "稍后")
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        menuBarManager?.openSettings()
+        return true
+    }
 
-        let response = alert.runModal()
-        if response == .alertFirstButtonReturn {
-            permissionManager.openSystemPreferences()
-        }
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        false
     }
 }

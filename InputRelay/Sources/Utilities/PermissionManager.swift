@@ -1,56 +1,59 @@
 import Foundation
 import AppKit
 import ApplicationServices
+import Combine
 
-/// 权限管理器 - 检查和请求系统权限
 @MainActor
-class PermissionManager: ObservableObject {
-    @Published var hasAccessibilityPermission = false
-    @Published var hasInputMonitoringPermission = false
-    
-    init() {
+final class PermissionManager: ObservableObject {
+    @Published private(set) var hasAccessibilityPermission = false
+
+    private let accessibilityCheck: () -> Bool
+    private var observations = Set<AnyCancellable>()
+
+    init(accessibilityCheck: @escaping () -> Bool = { AXIsProcessTrusted() }) {
+        self.accessibilityCheck = accessibilityCheck
         checkPermissions()
     }
-    
+
+    func startMonitoring() {
+        guard observations.isEmpty else { return }
+        checkPermissions()
+
+        // 授权发生在系统设置中，应用未重新激活时也需要刷新状态。
+        Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+            .sink { [weak self] _ in self?.checkPermissions() }
+            .store(in: &observations)
+        NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)
+            .sink { [weak self] _ in self?.checkPermissions() }
+            .store(in: &observations)
+    }
+
     func checkPermissions() {
-        hasAccessibilityPermission = checkAccessibilityPermission()
-        hasInputMonitoringPermission = checkInputMonitoringPermission()
+        let granted = accessibilityCheck()
+        if hasAccessibilityPermission != granted {
+            hasAccessibilityPermission = granted
+        }
     }
-    
-    private func checkAccessibilityPermission() -> Bool {
-        return AXIsProcessTrusted()
-    }
-    
-    private func checkInputMonitoringPermission() -> Bool {
-        // 输入监控权限无法直接查询，只能通过事件监听探测；
-        // 此处以辅助功能权限作为代理指标。
-        return hasAccessibilityPermission
-    }
-    
+
     func requestAccessibilityPermission() {
+        // 使用系统定义的键名，避开 SDK 将常量导入为可变全局量的并发限制。
         let options = ["AXTrustedCheckOptionPrompt": true] as CFDictionary
         _ = AXIsProcessTrustedWithOptions(options)
-        
-        // 延迟检查，给用户时间授权
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
-            self?.checkPermissions()
+        checkPermissions()
+        if !hasAccessibilityPermission {
+            openSystemPreferences()
         }
     }
-    
+
     func openSystemPreferences() {
-        let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
+        guard let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") else { return }
         NSWorkspace.shared.open(url)
     }
-    
-    var allPermissionsGranted: Bool {
-        hasAccessibilityPermission
+
+    func revealRunningApplication() {
+        NSWorkspace.shared.activateFileViewerSelecting([Bundle.main.bundleURL])
     }
-    
-    var missingPermissions: [String] {
-        var missing: [String] = []
-        if !hasAccessibilityPermission {
-            missing.append("辅助功能")
-        }
-        return missing
-    }
+
+    var runningApplicationPath: String { Bundle.main.bundleURL.path }
+    var allPermissionsGranted: Bool { hasAccessibilityPermission }
 }

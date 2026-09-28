@@ -25,6 +25,22 @@ struct Profile: Codable, Identifiable {
         self.isActive = isActive
     }
     
+    /// 编辑当前绑定时排除自身。
+    func mappingConflicts(for button: GamepadButton, excluding id: UUID?) -> [ButtonMapping] {
+        mappings.filter { $0.button == button && $0.id != id }
+    }
+
+    /// 同一配置的同一按键只保留一个绑定，包含已禁用的旧绑定。
+    @discardableResult
+    mutating func storeMapping(_ mapping: ButtonMapping, replacingConflicts: Bool = false) -> Bool {
+        let conflicts = mappingConflicts(for: mapping.button, excluding: mapping.id)
+        guard conflicts.isEmpty || replacingConflicts else { return false }
+        let insertionIndex = mappings.firstIndex(where: { $0.id == mapping.id || $0.button == mapping.button }) ?? mappings.count
+        mappings.removeAll { $0.id == mapping.id || $0.button == mapping.button }
+        mappings.insert(mapping, at: min(insertionIndex, mappings.count))
+        return true
+    }
+
     /// 检查是否匹配给定的应用
     func matches(bundleID: String, appName: String) -> Bool {
         if appRules.isEmpty {

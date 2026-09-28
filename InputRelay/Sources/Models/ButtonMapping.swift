@@ -12,6 +12,15 @@ enum MappingAction: Codable, Equatable {
         case horizontal
         case vertical
     }
+
+    var displayName: String {
+        switch self {
+        case .keyboardShortcut(let shortcut): return shortcut.displayString
+        case .mouseAction(let action): return action.rawValue
+        case .customScript(let script): return "脚本: \(script.prefix(30))"
+        case .mouseMovement(let axis, _): return "鼠标\(axis == .horizontal ? "水平" : "垂直")移动"
+        }
+    }
 }
 
 /// 键盘快捷键定义

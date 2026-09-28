@@ -10,7 +10,7 @@ struct AdvancedSettingsView: View {
                 VStack(alignment: .leading, spacing: 16) {
                     Text("系统权限")
                         .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(Color(hex: "#E5E7EB"))
+                        .foregroundColor(AppTheme.text)
                     
                     PermissionCard(
                         title: "辅助功能",
@@ -20,62 +20,75 @@ struct AdvancedSettingsView: View {
                             permissionManager.requestAccessibilityPermission()
                         }
                     )
+
+                    HStack {
+                        Button("重新检测") { permissionManager.checkPermissions() }
+                        Button("定位当前应用") { permissionManager.revealRunningApplication() }
+                    }
+
+                    Text("当前运行：\(permissionManager.runningApplicationPath)")
+                        .font(.system(size: 12, design: .monospaced))
+                        .foregroundStyle(AppTheme.secondary)
+                        .textSelection(.enabled)
+                        .fixedSize(horizontal: false, vertical: true)
                     
                     if !permissionManager.allPermissionsGranted {
                         HStack(spacing: 12) {
                             Image(systemName: "exclamationmark.triangle.fill")
-                                .foregroundColor(Color(hex: "#F59E0B"))
-                            Text("缺少必要权限，应用功能将受限")
+                                .foregroundColor(AppTheme.warning)
+                            Text("授权后会自动刷新。如果系统设置已开启但这里仍未授权，请移除旧条目，再添加上方路径的 InputRelay；更新本地构建后可能需要重新授权并重启应用。")
                                 .font(.system(size: 13))
-                                .foregroundColor(Color(hex: "#9CA3AF"))
+                                .foregroundColor(AppTheme.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
                         .padding()
-                        .background(Color(hex: "#0F131C"))
+                        .background(AppTheme.inset)
                         .cornerRadius(8)
                     }
                 }
                 .padding()
-                .background(Color(hex: "#0A0D12"))
+                .background(AppTheme.surface)
                 .cornerRadius(12)
                 
                 // 关于
                 VStack(alignment: .leading, spacing: 16) {
                     Text("关于")
                         .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(Color(hex: "#E5E7EB"))
+                        .foregroundColor(AppTheme.text)
                     
                     VStack(alignment: .leading, spacing: 12) {
                         InfoRow(label: "版本", value: "1.0.0")
-                        InfoRow(label: "构建", value: "2024.001")
-                        InfoRow(label: "支持的设备", value: "冰原狼 4 代及兼容手柄")
+                        InfoRow(label: "构建", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "开发版本")
+                        InfoRow(label: "按键布局", value: "Xbox · A / B / X / Y · LB / RB · LT / RT")
+                        InfoRow(label: "支持的设备", value: "macOS 可识别的扩展游戏手柄")
                     }
                     
                     Divider()
-                        .background(Color(hex: "#1E2636"))
+                        .background(AppTheme.border)
                     
                     VStack(alignment: .leading, spacing: 8) {
                         Text("配置文件位置")
                             .font(.system(size: 13, weight: .medium))
-                            .foregroundColor(Color(hex: "#9CA3AF"))
+                            .foregroundColor(AppTheme.secondary)
                         
                         Text("~/Library/Application Support/InputRelay/Profiles")
                             .font(.system(size: 12, design: .monospaced))
-                            .foregroundColor(Color(hex: "#6B7280"))
+                            .foregroundColor(AppTheme.muted)
                             .padding(10)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(Color(hex: "#0F131C"))
+                            .background(AppTheme.inset)
                             .cornerRadius(6)
                     }
                 }
                 .padding()
-                .background(Color(hex: "#0A0D12"))
+                .background(AppTheme.surface)
                 .cornerRadius(12)
                 
                 // 使用提示
                 VStack(alignment: .leading, spacing: 16) {
                     Text("使用提示")
                         .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(Color(hex: "#E5E7EB"))
+                        .foregroundColor(AppTheme.text)
                     
                     VStack(alignment: .leading, spacing: 12) {
                         TipRow(
@@ -97,7 +110,7 @@ struct AdvancedSettingsView: View {
                     }
                 }
                 .padding()
-                .background(Color(hex: "#0A0D12"))
+                .background(AppTheme.surface)
                 .cornerRadius(12)
                 
                 Spacer()
@@ -105,7 +118,7 @@ struct AdvancedSettingsView: View {
             .padding()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(hex: "#05070C"))
+        .background(AppTheme.background)
     }
 }
 
@@ -119,22 +132,22 @@ struct PermissionCard: View {
         HStack(spacing: 16) {
             Image(systemName: isGranted ? "checkmark.shield.fill" : "shield.slash.fill")
                 .font(.system(size: 32))
-                .foregroundColor(isGranted ? Color(hex: "#6EE7B7") : Color(hex: "#F59E0B"))
+                .foregroundColor(isGranted ? AppTheme.success : AppTheme.warning)
             
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(Color(hex: "#E5E7EB"))
+                    .foregroundColor(AppTheme.text)
                 
                 Text(description)
                     .font(.system(size: 12))
-                    .foregroundColor(Color(hex: "#9CA3AF"))
+                    .foregroundColor(AppTheme.secondary)
                 
                 if !isGranted {
                     Button(action: onRequest) {
                         Text("授予权限")
                             .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(Color(hex: "#38BDF8"))
+                            .foregroundColor(AppTheme.accent)
                     }
                     .buttonStyle(PlainButtonStyle())
                     .padding(.top, 4)
@@ -145,18 +158,18 @@ struct PermissionCard: View {
             
             Text(isGranted ? "已授权" : "未授权")
                 .font(.system(size: 12))
-                .foregroundColor(isGranted ? Color(hex: "#6EE7B7") : Color(hex: "#F59E0B"))
+                .foregroundColor(isGranted ? AppTheme.success : AppTheme.warning)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
                 .background(
                     isGranted ?
-                    Color(hex: "#6EE7B7").opacity(0.15) :
-                    Color(hex: "#F59E0B").opacity(0.15)
+                    AppTheme.success.opacity(0.15) :
+                    AppTheme.warning.opacity(0.15)
                 )
                 .cornerRadius(999)
         }
         .padding()
-        .background(Color(hex: "#0F131C"))
+        .background(AppTheme.inset)
         .cornerRadius(8)
     }
 }
@@ -169,11 +182,11 @@ struct InfoRow: View {
         HStack {
             Text(label)
                 .font(.system(size: 13))
-                .foregroundColor(Color(hex: "#9CA3AF"))
+                .foregroundColor(AppTheme.secondary)
             Spacer()
             Text(value)
                 .font(.system(size: 13, weight: .medium))
-                .foregroundColor(Color(hex: "#E5E7EB"))
+                .foregroundColor(AppTheme.text)
         }
         .padding(.vertical, 4)
     }
@@ -187,12 +200,12 @@ struct TipRow: View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: icon)
                 .font(.system(size: 16))
-                .foregroundColor(Color(hex: "#38BDF8"))
+                .foregroundColor(AppTheme.accent)
                 .frame(width: 24)
             
             Text(text)
                 .font(.system(size: 13))
-                .foregroundColor(Color(hex: "#E5E7EB"))
+                .foregroundColor(AppTheme.text)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(.vertical, 4)

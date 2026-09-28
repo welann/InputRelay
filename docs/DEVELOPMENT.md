@@ -73,7 +73,7 @@ swift build -c release --show-bin-path
 ### 运行应用
 
 ```bash
-# 启动应用（会在菜单栏显示）
+# 启动应用（直接显示主窗口，同时显示 Dock 和菜单栏入口）
 open .build/InputRelay.app
 
 # 或直接运行二进制
@@ -148,7 +148,7 @@ InputRelay/
 本项目使用 **Swift 6 严格并发检查**：
 
 - 主线程 UI 类使用 `@MainActor`
-- IOKit 回调使用独立上下文对象
+- GameController 回调通过主队列处理；持续摇杆操作由主 RunLoop 定时采样
 - 避免在 `deinit` 中访问 actor 隔离属性
 - 使用 `Task { @MainActor in ... }` 跨隔离域调用
 
@@ -166,12 +166,11 @@ InputRelay/
 final class GamepadManager: ObservableObject {
     @Published private(set) var isConnected = false
     
-    // MARK: - HID Setup
+    // MARK: - Controller Setup
     
     func start() {
-        // IOKit 回调在 HID RunLoop 线程上触发，
-        // 使用独立上下文对象避免跨隔离域捕获 self
-        let context = HIDContext(manager: self)
+        // 映射需要在其他应用位于前台时继续读取输入。
+        GCController.shouldMonitorBackgroundEvents = true
         // ...
     }
 }
@@ -205,7 +204,7 @@ swift build --disable-sandbox
 
 1. 检查菜单栏图标颜色（绿色 = 已连接）
 2. 确认辅助功能权限已授予
-3. 检查日志输出是否有 HID 相关错误
+3. 在“手柄状态”检查设备是否被 GameController 识别；多模式设备切换至 Xbox / XInput 模式
 
 **UI 不显示**
 
@@ -270,3 +269,32 @@ xcrun notarytool submit InputRelay-v1.0.0.dmg \
 ## 🤝 贡献
 
 查看 [CONTRIBUTING.md](../CONTRIBUTING.md) 了解如何贡献代码。
+
+## 输入与权限回归验证
+
+```bash
+swift test
+```
+
+测试使用系统提供的可写手柄快照，覆盖 Xbox 面键/肩键、方向键斜向和松开、独立模拟扳机、摇杆回中、持续采样、映射录入隔离、断连接管、旧配置兼容及权限授予/撤销刷新。真实设备连接、系统权限面板和合成输入仍需实机验证。
+
+若 Command Line Tools 的 macOS 27 SDK 缺失 SwiftUI 宏插件，可指定本机已安装的 SDK：
+
+```bash
+swift test --sdk /Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk --disable-xctest \
+  -Xswiftc -load-plugin-library \
+  -Xswiftc /Library/Developer/CommandLineTools/usr/lib/swift/host/plugins/testing/libTestingMacros.dylib
+```
+
+上述额外参数用于当前 Command Line Tools 的测试插件搜索路径问题，完整 Xcode 环境通常无需指定。在外层沙盒中构建时，可以设置 `INPUTRELAY_DISABLE_SANDBOX=1` 关闭 SwiftPM 的嵌套沙盒；不会关闭外层沙盒。
+
+在外层沙盒内，若新版 `swiftbuild` 的 dSYM 生成任务返回 `Operation not permitted`，可设置 `INPUTRELAY_BUILD_SYSTEM=native` 使用 SwiftPM 的兼容构建后端。此次验证使用以下命令成功生成并校验 release 应用：
+
+```bash
+CLANG_MODULE_CACHE_PATH="$PWD/.build/ModuleCache" \
+SWIFTPM_MODULECACHE_OVERRIDE="$PWD/.build/ModuleCache" \
+INPUTRELAY_BUILD_SYSTEM=native \
+INPUTRELAY_DISABLE_SANDBOX=1 \
+INPUTRELAY_SDK=/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk \
+./build.sh release
+```

@@ -83,6 +83,9 @@ class ConfigurationEngine: ObservableObject {
             } else {
                 profiles.append(profile)
             }
+            if activeProfile?.id == profile.id {
+                activeProfile = profile
+            }
             
         } catch {
             print("Failed to save profile: \(error)")
@@ -116,10 +119,8 @@ class ConfigurationEngine: ObservableObject {
         newProfile.isActive = true
         saveProfile(newProfile)
         
-        DispatchQueue.main.async {
-            self.activeProfile = newProfile
-            print("Activated profile: \(newProfile.name)")
-        }
+        activeProfile = newProfile
+        print("Activated profile: \(newProfile.name)")
     }
     
     private func createDefaultProfiles() {
@@ -174,17 +175,19 @@ class ConfigurationEngine: ObservableObject {
         gamepadManager.setEventHandler { [weak self] event in
             self?.handleGamepadEvent(event)
         }
+        gamepadManager.setStickHandler { [weak self] in
+            guard let self, self.isEnabled, let profile = self.activeProfile else { return }
+            self.handleStickMovement(isLeftStick: true, settings: profile.stickSettings)
+            self.handleStickMovement(isLeftStick: false, settings: profile.stickSettings)
+        }
     }
     
     private func handleGamepadEvent(_ event: GamepadEvent) {
         guard isEnabled else { return }
         guard let profile = activeProfile else { return }
         
-        // 处理摇杆移动
-        if event.button.isStickAxis {
-            handleStickMovement(event, settings: profile.stickSettings)
-            return
-        }
+        // 连续摇杆动作由每帧回调处理；方向事件只用于识别和显示。
+        guard !event.button.isStickAxis else { return }
         
         // 查找对应的映射
         guard let mapping = profile.mappings.first(where: { $0.button == event.button && $0.enabled }),
@@ -196,9 +199,7 @@ class ConfigurationEngine: ObservableObject {
         executeAction(mapping.action)
     }
     
-    private func handleStickMovement(_ event: GamepadEvent, settings: StickSettings) {
-        // 判断是左摇杆还是右摇杆
-        let isLeftStick = [.leftStickUp, .leftStickDown, .leftStickLeft, .leftStickRight].contains(event.button)
+    private func handleStickMovement(isLeftStick: Bool, settings: StickSettings) {
         let mode = isLeftStick ? settings.leftStickMode : settings.rightStickMode
         
         guard mode != .disabled else { return }
@@ -210,14 +211,15 @@ class ConfigurationEngine: ObservableObject {
         if mode == .mouse {
             mouseSimulator.handleStickInput(
                 x: x,
-                y: y,
+                y: -y,
                 sensitivity: settings.sensitivity,
                 curve: settings.accelerationCurve,
                 deadzone: settings.deadzone
             )
         } else if mode == .scroll {
-            // 屏幕坐标向下为正，滚轮向上为正，所以取反
-            let scrollAmount = Int32(-y * settings.sensitivity * 10)
+            guard abs(y) > settings.deadzone else { return }
+            // GameController 的 Y 轴与滚轮都以向上为正。
+            let scrollAmount = Int32(y * settings.sensitivity * 10)
             if abs(scrollAmount) > 0 {
                 mouseSimulator.scroll(deltaY: scrollAmount)
             }

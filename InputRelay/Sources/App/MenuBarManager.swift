@@ -133,11 +133,13 @@ final class MenuBarManager: NSObject {
         updateIcon()
     }
 
-    @objc private func openSettings() {
+    @objc func openSettings() {
         if mainWindow == nil {
             createMainWindow()
         }
 
+        permissionManager.checkPermissions()
+        mainWindow?.deminiaturize(nil)
         mainWindow?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
@@ -154,6 +156,8 @@ final class MenuBarManager: NSObject {
             permissionManager: permissionManager,
             gamepadManager: gamepadManager
         )
+        .preferredColorScheme(.light)
+        .tint(AppTheme.accent)
 
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 900, height: 600),
@@ -164,6 +168,8 @@ final class MenuBarManager: NSObject {
 
         window.center()
         window.title = "InputRelay"
+        window.appearance = NSAppearance(named: .aqua)
+        window.contentMinSize = NSSize(width: 900, height: 600)
         window.contentView = NSHostingView(rootView: contentView)
         window.isReleasedWhenClosed = false
 

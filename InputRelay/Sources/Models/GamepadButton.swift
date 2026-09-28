@@ -42,7 +42,19 @@ enum GamepadButton: String, Codable, CaseIterable {
     case rightStickRight = "RS-Right"
     
     var displayName: String {
-        rawValue
+        // 保留旧 rawValue，已有 JSON 配置无需迁移。
+        switch self {
+        case .leftShoulder: return "LB"
+        case .rightShoulder: return "RB"
+        case .leftTrigger: return "LT"
+        case .rightTrigger: return "RT"
+        case .leftStickButton: return "LS"
+        case .rightStickButton: return "RS"
+        case .selectButton: return "View"
+        case .startButton: return "Menu"
+        case .homeButton: return "Xbox"
+        default: return rawValue
+        }
     }
     
     var isStickAxis: Bool {
@@ -59,7 +71,7 @@ enum GamepadButton: String, Codable, CaseIterable {
 /// 手柄输入事件
 struct GamepadEvent {
     let button: GamepadButton
-    let value: Float  // 0.0-1.0，按键为 0 或 1，摇杆为 -1.0 到 1.0
+    let value: Float  // 0.0-1.0；摇杆方向拆成各自的正向幅度。
     let timestamp: TimeInterval
     
     var isPressed: Bool {

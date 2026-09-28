@@ -11,6 +11,10 @@ struct MainWindowView: View {
         VStack(spacing: 0) {
             // 顶部标签栏
             HStack(spacing: 20) {
+                Label("InputRelay", systemImage: "gamecontroller.fill")
+                    .font(.system(size: 18, weight: .bold, design: .rounded))
+                    .foregroundStyle(AppTheme.text)
+                    .padding(.trailing, 16)
                 TabButton(title: "配置管理", isSelected: selectedTab == 0) {
                     selectedTab = 0
                 }
@@ -23,10 +27,26 @@ struct MainWindowView: View {
                 Spacer()
             }
             .padding()
-            .background(Color(hex: "#0A0D12"))
+            .background(AppTheme.surface)
             
             Divider()
-                .background(Color(hex: "#1E2636"))
+                .background(AppTheme.border)
+
+            if !permissionManager.hasAccessibilityPermission {
+                HStack(spacing: 12) {
+                    Image(systemName: "exclamationmark.shield")
+                        .foregroundStyle(AppTheme.warning)
+                    Text("需要辅助功能权限才能控制键盘和鼠标")
+                        .font(.system(size: 13))
+                        .foregroundStyle(AppTheme.text)
+                    Spacer()
+                    Button("查看权限") { selectedTab = 2 }
+                    Button("打开系统设置") { permissionManager.requestAccessibilityPermission() }
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 12)
+                .background(AppTheme.warning.opacity(0.08))
+            }
             
             // 内容区域
             Group {
@@ -46,7 +66,7 @@ struct MainWindowView: View {
             }
         }
         .frame(minWidth: 900, minHeight: 600)
-        .background(Color(hex: "#05070C"))
+        .background(AppTheme.background)
     }
 }
 
@@ -59,12 +79,12 @@ struct TabButton: View {
         Button(action: action) {
             Text(title)
                 .font(.system(size: 14, weight: isSelected ? .semibold : .regular))
-                .foregroundColor(isSelected ? Color(hex: "#38BDF8") : Color(hex: "#9CA3AF"))
+                .foregroundColor(isSelected ? AppTheme.accent : AppTheme.secondary)
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
                 .background(
                     isSelected ?
-                    Color(hex: "#1E3A5F").opacity(0.3) :
+                    AppTheme.selection :
                     Color.clear
                 )
                 .cornerRadius(8)

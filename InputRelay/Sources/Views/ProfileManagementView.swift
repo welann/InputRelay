@@ -14,7 +14,7 @@ struct ProfileManagementView: View {
             VStack(alignment: .leading, spacing: 12) {
                 Text("配置文件")
                     .font(.system(size: 16, weight: .semibold))
-                    .foregroundColor(Color(hex: "#E5E7EB"))
+                    .foregroundColor(AppTheme.text)
                     .padding(.horizontal)
                 
                 ScrollView {
@@ -40,10 +40,10 @@ struct ProfileManagementView: View {
                         Text("新建配置")
                     }
                     .font(.system(size: 14))
-                    .foregroundColor(Color(hex: "#38BDF8"))
+                    .foregroundColor(AppTheme.accent)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 10)
-                    .background(Color(hex: "#0F131C"))
+                    .background(AppTheme.inset)
                     .cornerRadius(8)
                 }
                 .buttonStyle(PlainButtonStyle())
@@ -51,7 +51,7 @@ struct ProfileManagementView: View {
                 .padding(.bottom)
             }
             .frame(width: 280)
-            .background(Color(hex: "#0A0D12"))
+            .background(AppTheme.surface)
             
             // 右侧：映射编辑
             if let profile = selectedProfile {
@@ -67,16 +67,17 @@ struct ProfileManagementView: View {
                         selectedProfile = nil
                     }
                 )
+                .id(profile.id)
             } else {
                 VStack {
                     Spacer()
                     Text("选择一个配置文件以编辑")
                         .font(.system(size: 16))
-                        .foregroundColor(Color(hex: "#6B7280"))
+                        .foregroundColor(AppTheme.muted)
                     Spacer()
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(Color(hex: "#05070C"))
+                .background(AppTheme.background)
             }
         }
         .sheet(isPresented: $showingNewProfileSheet) {
@@ -84,6 +85,11 @@ struct ProfileManagementView: View {
                 let newProfile = Profile(name: name)
                 configEngine.saveProfile(newProfile)
                 selectedProfile = newProfile
+            }
+        }
+        .onAppear {
+            if selectedProfile == nil {
+                selectedProfile = configEngine.activeProfile ?? configEngine.profiles.first
             }
         }
     }
@@ -101,7 +107,7 @@ struct ProfileCard: View {
             // 左侧指示器
             if isActive {
                 Rectangle()
-                    .fill(Color(hex: "#38BDF8"))
+                    .fill(AppTheme.accent)
                     .frame(width: 4)
                     .cornerRadius(2)
             } else {
@@ -111,11 +117,11 @@ struct ProfileCard: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(profile.name)
                     .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(Color(hex: "#E5E7EB"))
+                    .foregroundColor(AppTheme.text)
                 
                 Text("\(profile.mappings.count) 个映射")
                     .font(.system(size: 12))
-                    .foregroundColor(Color(hex: "#6B7280"))
+                    .foregroundColor(AppTheme.muted)
                 
                 if !profile.appRules.isEmpty {
                     Text(profile.appRules.map { rule in
@@ -125,7 +131,7 @@ struct ProfileCard: View {
                         }
                     }.joined(separator: ", "))
                     .font(.system(size: 11))
-                    .foregroundColor(Color(hex: "#9CA3AF"))
+                    .foregroundColor(AppTheme.secondary)
                     .lineLimit(1)
                 }
             }
@@ -134,15 +140,15 @@ struct ProfileCard: View {
             
             if isActive {
                 Image(systemName: "checkmark.circle.fill")
-                    .foregroundColor(Color(hex: "#38BDF8"))
+                    .foregroundColor(AppTheme.accent)
             }
         }
         .padding(12)
-        .background(isSelected ? Color(hex: "#161D2B") : Color(hex: "#0F131C"))
+        .background(isSelected ? AppTheme.selection : AppTheme.inset)
         .cornerRadius(8)
         .overlay(
             RoundedRectangle(cornerRadius: 8)
-                .stroke(isSelected ? Color(hex: "#38BDF8").opacity(0.3) : Color.clear, lineWidth: 1)
+                .stroke(isSelected ? AppTheme.accent.opacity(0.3) : Color.clear, lineWidth: 1)
         )
         .onTapGesture {
             onSelect()
@@ -166,14 +172,14 @@ struct NewProfileSheet: View {
         VStack(spacing: 20) {
             Text("新建配置")
                 .font(.system(size: 18, weight: .semibold))
-                .foregroundColor(Color(hex: "#E5E7EB"))
+                .foregroundColor(AppTheme.text)
             
             TextField("配置名称", text: $profileName)
                 .textFieldStyle(PlainTextFieldStyle())
                 .padding(12)
-                .background(Color(hex: "#0F131C"))
+                .background(AppTheme.inset)
                 .cornerRadius(8)
-                .foregroundColor(Color(hex: "#E5E7EB"))
+                .foregroundColor(AppTheme.text)
             
             HStack(spacing: 12) {
                 Button("取消") {
@@ -192,6 +198,6 @@ struct NewProfileSheet: View {
         }
         .padding(24)
         .frame(width: 400)
-        .background(Color(hex: "#0A0D12"))
+        .background(AppTheme.surface)
     }
 }
