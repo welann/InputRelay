@@ -49,7 +49,7 @@ class ConfigurationEngine: ObservableObject {
     func loadProfiles() {
         do {
             let files = try FileManager.default.contentsOfDirectory(at: profilesDirectory, includingPropertiesForKeys: nil)
-            let jsonFiles = files.filter { $0.pathExtension == "json" }
+            let jsonFiles = files.filter { $0.pathExtension == "json" }.sorted { $0.lastPathComponent < $1.lastPathComponent }
             
             profiles = jsonFiles.compactMap { url in
                 guard let data = try? Data(contentsOf: url),
@@ -291,12 +291,15 @@ class ConfigurationEngine: ObservableObject {
     }
     
     private func handleAppSwitch(bundleID: String, appName: String) {
-        // 查找匹配的配置
-        if let matchedProfile = profiles.first(where: { $0.matches(bundleID: bundleID, appName: appName) }) {
+        if let matchedProfile = Profile.preferredProfile(in: profiles, bundleID: bundleID, appName: appName) {
             if activeProfile?.id != matchedProfile.id {
                 activateProfile(matchedProfile)
                 print("Switched to profile: \(matchedProfile.name) for app: \(appName)")
             }
+        } else if var previous = activeProfile {
+            previous.isActive = false
+            saveProfile(previous)
+            activeProfile = nil
         }
     }
 }

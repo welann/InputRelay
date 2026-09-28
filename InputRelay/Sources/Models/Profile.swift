@@ -46,15 +46,27 @@ struct Profile: Codable, Identifiable {
         if appRules.isEmpty {
             return name == "全局配置"
         }
-        
-        return appRules.contains { rule in
-            switch rule {
-            case .bundleID(let pattern):
-                return bundleID.localizedCaseInsensitiveContains(pattern)
-            case .appName(let pattern):
-                return appName.localizedCaseInsensitiveContains(pattern)
+
+        return appRules.contains { $0.matches(bundleID: bundleID, appName: appName) }
+    }
+
+    @discardableResult
+    mutating func addAppRule(_ rule: AppRule) -> Bool {
+        guard let normalized = rule.normalized,
+              !appRules.contains(where: { $0.isEquivalent(to: normalized) }) else { return false }
+        appRules.append(normalized)
+        return true
+    }
+
+    static func preferredProfile(in profiles: [Profile], bundleID: String, appName: String) -> Profile? {
+        // 全局配置只兜底，精确 Bundle ID 比名称包含匹配更具体。
+        let explicit = profiles.filter { !$0.appRules.isEmpty && $0.matches(bundleID: bundleID, appName: appName) }
+        return explicit.first(where: { profile in
+            profile.appRules.contains { rule in
+                if case .bundleID = rule { return rule.matches(bundleID: bundleID, appName: appName) }
+                return false
             }
-        }
+        }) ?? explicit.first ?? profiles.first(where: { $0.name == "全局配置" })
     }
 }
 
@@ -62,6 +74,33 @@ struct Profile: Codable, Identifiable {
 enum AppRule: Codable, Equatable {
     case bundleID(String)
     case appName(String)
+
+    var normalized: AppRule? {
+        let value: String
+        switch self {
+        case .bundleID(let id): value = id.trimmingCharacters(in: .whitespacesAndNewlines)
+        case .appName(let name): value = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        guard !value.isEmpty else { return nil }
+        if case .bundleID = self { return .bundleID(value) }
+        return .appName(value)
+    }
+
+    func isEquivalent(to other: AppRule) -> Bool {
+        switch (normalized, other.normalized) {
+        case (.bundleID(let lhs)?, .bundleID(let rhs)?), (.appName(let lhs)?, .appName(let rhs)?):
+            return lhs.caseInsensitiveCompare(rhs) == .orderedSame
+        default: return false
+        }
+    }
+
+    func matches(bundleID: String, appName: String) -> Bool {
+        switch normalized {
+        case .bundleID(let id): return bundleID.caseInsensitiveCompare(id) == .orderedSame
+        case .appName(let name): return appName.localizedCaseInsensitiveContains(name)
+        case nil: return false
+        }
+    }
     
     var displayString: String {
         switch self {

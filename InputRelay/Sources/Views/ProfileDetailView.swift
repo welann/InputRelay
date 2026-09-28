@@ -9,6 +9,7 @@ struct ProfileDetailView: View {
     @State private var editingProfile: Profile
     @State private var editorSession: MappingEditorSession?
     @State private var showingDeleteAlert = false
+    @State private var showingAppRuleSheet = false
 
     private struct MappingEditorSession: Identifiable {
         let id = UUID()
@@ -71,7 +72,7 @@ struct ProfileDetailView: View {
                             .cornerRadius(6)
                         }
                         
-                        Button(action: addAppRule) {
+                        Button(action: { showingAppRuleSheet = true }) {
                             HStack {
                                 Image(systemName: "plus.circle")
                                 Text("添加规则")
@@ -149,6 +150,13 @@ struct ProfileDetailView: View {
                 }
             )
         }
+        .sheet(isPresented: $showingAppRuleSheet) {
+            AppRuleEditorSheet(existingRules: editingProfile.appRules) { rule in
+                guard editingProfile.addAppRule(rule) else { return false }
+                saveChanges()
+                return true
+            }
+        }
         .alert("删除配置", isPresented: $showingDeleteAlert) {
             Button("取消", role: .cancel) { }
             Button("删除", role: .destructive) {
@@ -161,15 +169,6 @@ struct ProfileDetailView: View {
     
     private func saveChanges() {
         onUpdate(editingProfile)
-    }
-    
-    private func addAppRule() {
-        // 简单实现：添加当前前台应用
-        if let app = NSWorkspace.shared.frontmostApplication,
-           let name = app.localizedName {
-            editingProfile.appRules.append(.appName(name))
-            saveChanges()
-        }
     }
     
     private func toggleMapping(_ mapping: ButtonMapping) {

@@ -104,7 +104,7 @@ ioreg -p IOUSB -w0 | grep -i gamepad
 
 ### 单元测试
 
-（待添加）
+测试包含手柄事件、权限刷新、双屏鼠标、映射冲突、键盘录入和组合键发送。
 
 ```bash
 # 运行测试
@@ -297,4 +297,18 @@ INPUTRELAY_BUILD_SYSTEM=native \
 INPUTRELAY_DISABLE_SANDBOX=1 \
 INPUTRELAY_SDK=/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk \
 ./build.sh release
+```
+
+若兼容构建后端提示 `no such module 'Testing'`，需要补充 Command Line Tools 自带的测试框架路径：
+
+```bash
+CLANG_MODULE_CACHE_PATH="$PWD/.build/ModuleCache" \
+SWIFTPM_MODULECACHE_OVERRIDE="$PWD/.build/ModuleCache" \
+swift test --build-system native --disable-sandbox \
+  --sdk /Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk --disable-xctest \
+  -Xswiftc -F -Xswiftc /Library/Developer/CommandLineTools/Library/Developer/Frameworks \
+  -Xlinker -F -Xlinker /Library/Developer/CommandLineTools/Library/Developer/Frameworks \
+  -Xlinker -rpath -Xlinker /Library/Developer/CommandLineTools/Library/Developer/Frameworks \
+  -Xswiftc -load-plugin-library \
+  -Xswiftc /Library/Developer/CommandLineTools/usr/lib/swift/host/plugins/testing/libTestingMacros.dylib
 ```
