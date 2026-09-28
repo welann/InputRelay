@@ -12,15 +12,9 @@ enum AppMark {
     }
 
     /// 菜单栏用的模板图：系统按菜单栏明暗自动着色。
-    /// 未连接时降低不透明度，保留原先 idle / connected 的状态区分。
-    static func statusImage(connected: Bool, size: CGFloat = 18) -> NSImage {
-        let source = image(size: size)
-        guard !connected else { return template(source) }
-        let dimmed = NSImage(size: source.size, flipped: false) { rect in
-            source.draw(in: rect, from: .zero, operation: .sourceOver, fraction: 0.4)
-            return true
-        }
-        return template(dimmed)
+    /// 始终保持完整不透明度，连接状态由菜单文字表示。
+    static func statusImage(size: CGFloat = 18) -> NSImage {
+        template(image(size: size))
     }
 
     private static func template(_ image: NSImage) -> NSImage {

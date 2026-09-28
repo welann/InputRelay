@@ -13,9 +13,10 @@ struct ProfileManagementView: View {
             // 左侧：配置列表
             VStack(alignment: .leading, spacing: 12) {
                 Text("配置文件")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundColor(AppTheme.text)
-                    .padding(.horizontal)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(AppTheme.secondary)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 20)
                 
                 ScrollView {
                     VStack(spacing: 8) {

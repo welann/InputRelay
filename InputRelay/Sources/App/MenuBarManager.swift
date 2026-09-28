@@ -50,7 +50,7 @@ final class MenuBarManager: NSObject {
     }
 
     private func icon(for state: IconState) -> NSImage? {
-        AppMark.statusImage(connected: state == .connected)
+        AppMark.statusImage()
     }
 
     @objc private func gamepadConnectionChanged() {
