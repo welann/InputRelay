@@ -4,25 +4,43 @@ import Carbon
 
 /// 键盘模拟器 - 负责模拟键盘按键
 class KeyboardSimulator {
+    private let postEvent: (CGEvent) -> Void
+
+    init(postEvent: @escaping (CGEvent) -> Void = { $0.post(tap: .cghidEventTap) }) {
+        self.postEvent = postEvent
+    }
     
     /// 发送键盘快捷键
     func sendShortcut(_ shortcut: KeyboardShortcut) {
-        let keyCode = CGKeyCode(shortcut.keyCode)
-        let flags = shortcut.modifiers.cgEventFlags
-        
-        // 按下
-        if let keyDown = CGEvent(keyboardEventSource: nil, virtualKey: keyCode, keyDown: true) {
-            keyDown.flags = flags
-            keyDown.post(tap: .cghidEventTap)
+        guard shortcut.isValid else { return }
+        let modifierKeys = KeyboardShortcut.ModifierFlags.keyCodes.filter { shortcut.modifiers.contains($0.flag) }
+        var flags: KeyboardShortcut.ModifierFlags = []
+        var events: [CGEvent] = []
+        func append(_ code: Int, down: Bool) -> Bool {
+            guard let event = CGEvent(keyboardEventSource: nil, virtualKey: CGKeyCode(code), keyDown: down) else { return false }
+            event.flags = flags.cgEventFlags
+            events.append(event)
+            return true
         }
-        
-        // 短暂延迟
-        usleep(10_000)  // 10ms
-        
-        // 抬起
-        if let keyUp = CGEvent(keyboardEventSource: nil, virtualKey: keyCode, keyDown: false) {
-            keyUp.flags = flags
-            keyUp.post(tap: .cghidEventTap)
+        // 先创建完整的按下/松开序列，创建失败时不留下卡住的按键。
+        for key in modifierKeys {
+            flags.insert(key.flag)
+            guard append(key.code, down: true) else { return }
+        }
+        for code in shortcut.keyCodes {
+            guard append(code, down: true) else { return }
+        }
+        let downCount = events.count
+        for code in shortcut.keyCodes.reversed() {
+            guard append(code, down: false) else { return }
+        }
+        for key in modifierKeys.reversed() {
+            flags.remove(key.flag)
+            guard append(key.code, down: false) else { return }
+        }
+        for (index, event) in events.enumerated() {
+            if index == downCount { usleep(10_000) }
+            postEvent(event)
         }
     }
     

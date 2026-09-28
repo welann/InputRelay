@@ -10,8 +10,8 @@ struct MappingEditorSheet: View {
 
     @State private var capture: MappingInputCapture
     @State private var actionType: ActionType = .keyboard
-    @State private var keyCode: Int = kVK_Return
-    @State private var modifiers: KeyboardShortcut.ModifierFlags = []
+    @State private var shortcut = KeyboardShortcut(keyCode: kVK_Return, modifiers: [])
+    @StateObject private var keyboardRecorder = KeyboardShortcutRecorder()
     @State private var mouseAction: MouseAction = .leftClick
     @State private var customScript = ""
     @State private var showingReplaceAlert = false
@@ -33,8 +33,7 @@ struct MappingEditorSheet: View {
         if let mapping {
             switch mapping.action {
             case .keyboardShortcut(let shortcut):
-                _keyCode = State(initialValue: shortcut.keyCode)
-                _modifiers = State(initialValue: shortcut.modifiers)
+                _shortcut = State(initialValue: shortcut)
             case .mouseAction(let action):
                 _actionType = State(initialValue: .mouse)
                 _mouseAction = State(initialValue: action)
@@ -137,7 +136,8 @@ struct MappingEditorSheet: View {
                         .pickerStyle(.segmented)
                     }
                     switch actionType {
-                    case .keyboard: KeyboardShortcutEditor(keyCode: $keyCode, modifiers: $modifiers)
+                    case .keyboard:
+                        KeyboardShortcutEditor(shortcut: $shortcut, recorder: keyboardRecorder) { capture.stop() }
                     case .mouse: MouseActionEditor(action: $mouseAction)
                     case .script: CustomScriptEditor(script: $customScript)
                     }
@@ -154,7 +154,7 @@ struct MappingEditorSheet: View {
                 Spacer()
                 Button(conflicts.isEmpty ? "保存" : "替换并保存…") { saveMapping() }
                     .keyboardShortcut(.return)
-                    .disabled(capture.isWaiting || capture.selectedButton == nil || capture.selectedButton?.isStickAxis == true)
+                    .disabled(capture.isWaiting || keyboardRecorder.isRecording || capture.selectedButton == nil || capture.selectedButton?.isStickAxis == true || (actionType == .keyboard && !shortcut.isValid))
             }
         }
         .padding(24)
@@ -165,7 +165,11 @@ struct MappingEditorSheet: View {
             gamepadManager.isCapturingInput = true
             if mapping == nil { startWaitingForInput() }
         }
-        .onDisappear { gamepadManager.isCapturingInput = false }
+        .onDisappear {
+            keyboardRecorder.stop()
+            gamepadManager.isCapturingInput = false
+        }
+        .onChange(of: actionType) { _, _ in keyboardRecorder.stop() }
         .onReceive(gamepadManager.inputEvents) { capture.receive($0) }
         .alert("替换已有绑定？", isPresented: $showingReplaceAlert) {
             Button("返回选键", role: .cancel) { startWaitingForInput() }
@@ -176,19 +180,22 @@ struct MappingEditorSheet: View {
     }
 
     private func startWaitingForInput() {
+        keyboardRecorder.stop()
         capture.begin(heldButtons: Set(gamepadManager.buttonStates.filter { $0.value > 0.5 }.map(\.key)))
         saveRejected = false
     }
 
     private func saveMapping(replace: Bool = false) {
-        guard !capture.isWaiting, let button = capture.selectedButton, !button.isStickAxis else { return }
+        guard !capture.isWaiting, !keyboardRecorder.isRecording,
+              let button = capture.selectedButton, !button.isStickAxis else { return }
+        guard actionType != .keyboard || shortcut.isValid else { return }
         if !conflicts.isEmpty && !replace {
             showingReplaceAlert = true
             return
         }
         let action: MappingAction
         switch actionType {
-        case .keyboard: action = .keyboardShortcut(KeyboardShortcut(keyCode: keyCode, modifiers: modifiers))
+        case .keyboard: action = .keyboardShortcut(shortcut)
         case .mouse: action = .mouseAction(mouseAction)
         case .script: action = .customScript(customScript)
         }
@@ -199,62 +206,84 @@ struct MappingEditorSheet: View {
 }
 
 struct KeyboardShortcutEditor: View {
-    @Binding var keyCode: Int
-    @Binding var modifiers: KeyboardShortcut.ModifierFlags
-    
+    @Binding var shortcut: KeyboardShortcut
+    @ObservedObject var recorder: KeyboardShortcutRecorder
+    let onStartRecording: () -> Void
+    @State private var showingManualSelection = false
+    @State private var recordingAnchor = NSView()
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            // 修饰键
-            HStack(spacing: 12) {
-                ModifierButton(title: "⌃", isActive: modifiers.contains(.control)) {
-                    modifiers.toggle(.control)
-                }
-                ModifierButton(title: "⌥", isActive: modifiers.contains(.option)) {
-                    modifiers.toggle(.option)
-                }
-                ModifierButton(title: "⇧", isActive: modifiers.contains(.shift)) {
-                    modifiers.toggle(.shift)
-                }
-                ModifierButton(title: "⌘", isActive: modifiers.contains(.command)) {
-                    modifiers.toggle(.command)
-                }
-            }
-            
-            // 按键选择
-            VStack(alignment: .leading, spacing: 4) {
-                Text("按键")
-                    .font(.system(size: 12))
-                    .foregroundColor(AppTheme.muted)
-                
-                Picker("", selection: $keyCode) {
-                    ForEach(commonKeys, id: \.value) { key in
-                        Text(key.name).tag(key.value)
+            Label(recorder.isRecording ? "请按下键盘按键或组合键" : "键盘按键 / 组合键", systemImage: "keyboard")
+                .font(.system(size: 13, weight: .medium))
+            Text(recorder.isRecording ? (recorder.preview?.displayString ?? "等待键盘输入…") : (shortcut.isValid ? shortcut.displayString : "尚未选择键盘按键"))
+                .font(.system(size: 22, weight: .semibold, design: .monospaced))
+                .foregroundStyle(AppTheme.accent)
+                .frame(maxWidth: .infinity, minHeight: 42, alignment: .leading)
+                .accessibilityLabel("键盘绑定")
+                .accessibilityValue(recorder.isRecording ? (recorder.preview?.displayString ?? "等待输入") : shortcut.displayString)
+            Text(recorder.isWaitingForRelease && recorder.isRecording
+                 ? "请先松开已按住的按键，再录入新组合。"
+                 : "例如 F、⌘C、⌃⇧P，或同时按住 A + S。按下时显示，整组松开后完成。")
+                .font(.system(size: 12))
+                .foregroundStyle(AppTheme.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack {
+                Button(recorder.isRecording ? "停止键盘录入" : "录入键盘按键") {
+                    if recorder.isRecording {
+                        recorder.stop()
+                    } else {
+                        onStartRecording()
+                        recordingAnchor.window?.makeKeyAndOrderFront(nil)
+                        recorder.start(in: recordingAnchor.window) { shortcut = $0 }
                     }
                 }
-                .pickerStyle(MenuPickerStyle())
-                .frame(maxWidth: .infinity)
+                Button(showingManualSelection ? "收起手动选择" : "手动选择") {
+                    recorder.stop()
+                    showingManualSelection.toggle()
+                }
+            }
+            Text("录入时 Return、Esc 和应用快捷键只用于识别。系统保留的组合键可能无法录入；功能键需让键盘发送 F1–F12。")
+                .font(.system(size: 11))
+                .foregroundStyle(AppTheme.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            if showingManualSelection {
+                HStack(spacing: 12) {
+                    ForEach(KeyboardShortcut.ModifierFlags.keyCodes, id: \.code) { entry in
+                        ModifierButton(title: entry.flag.displayString, isActive: shortcut.modifiers.contains(entry.flag)) {
+                            recorder.stop()
+                            var modifiers = shortcut.modifiers
+                            modifiers.toggle(entry.flag)
+                            shortcut = KeyboardShortcut(keyCodes: shortcut.keyCodes, modifiers: modifiers)
+                        }
+                    }
+                }
+                Menu("选择单个按键") {
+                    ForEach(KeyboardShortcut.keyNames.keys.sorted(), id: \.self) { code in
+                        Button(KeyboardShortcut.keyName(code)) {
+                            recorder.stop()
+                            shortcut = KeyboardShortcut(keyCode: code, modifiers: shortcut.modifiers)
+                        }
+                    }
+                }
+                Text("手动选择单键会替换当前组合中的普通按键。")
+                    .font(.system(size: 11))
+                    .foregroundStyle(AppTheme.secondary)
             }
         }
         .padding()
         .background(AppTheme.inset)
+        .background(KeyboardRecordingAnchor(view: recordingAnchor))
         .cornerRadius(8)
     }
-    
-    private let commonKeys: [(name: String, value: Int)] = [
-        ("A", kVK_ANSI_A), ("B", kVK_ANSI_B), ("C", kVK_ANSI_C), ("D", kVK_ANSI_D),
-        ("E", kVK_ANSI_E), ("F", kVK_ANSI_F), ("G", kVK_ANSI_G), ("H", kVK_ANSI_H),
-        ("I", kVK_ANSI_I), ("J", kVK_ANSI_J), ("K", kVK_ANSI_K), ("L", kVK_ANSI_L),
-        ("M", kVK_ANSI_M), ("N", kVK_ANSI_N), ("O", kVK_ANSI_O), ("P", kVK_ANSI_P),
-        ("Q", kVK_ANSI_Q), ("R", kVK_ANSI_R), ("S", kVK_ANSI_S), ("T", kVK_ANSI_T),
-        ("U", kVK_ANSI_U), ("V", kVK_ANSI_V), ("W", kVK_ANSI_W), ("X", kVK_ANSI_X),
-        ("Y", kVK_ANSI_Y), ("Z", kVK_ANSI_Z),
-        ("Return ↩", kVK_Return), ("Tab ⇥", kVK_Tab), ("Space", kVK_Space),
-        ("Delete ⌫", kVK_Delete), ("Escape ⎋", kVK_Escape),
-        ("← Left", kVK_LeftArrow), ("→ Right", kVK_RightArrow),
-        ("↑ Up", kVK_UpArrow), ("↓ Down", kVK_DownArrow),
-        ("F1", kVK_F1), ("F2", kVK_F2), ("F3", kVK_F3), ("F4", kVK_F4),
-        ("F5", kVK_F5), ("F6", kVK_F6), ("F7", kVK_F7), ("F8", kVK_F8)
-    ]
+}
+
+private struct KeyboardRecordingAnchor: NSViewRepresentable {
+    let view: NSView
+
+    func makeNSView(context: Context) -> NSView { view }
+    func updateNSView(_ nsView: NSView, context: Context) { }
 }
 
 struct ModifierButton: View {
