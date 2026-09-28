@@ -13,17 +13,9 @@ permissions:
 
 jobs:
   build:
-    name: Build (${{ matrix.arch }})
-    runs-on: ${{ matrix.runner }}
+    name: Build (arm64)
+    runs-on: macos-15
     timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - runner: macos-15
-            arch: arm64
-          - runner: macos-15-intel
-            arch: x86_64
     env:
       DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
     steps:
@@ -59,7 +51,7 @@ jobs:
       - name: Package and verify
         shell: bash
         env:
-          ARCH: ${{ matrix.arch }}
+          ARCH: arm64
         run: |
           set -euo pipefail
           lipo -verify_arch "$ARCH" .build/InputRelay.app/Contents/MacOS/InputRelay
@@ -71,7 +63,7 @@ jobs:
       - name: Upload build
         uses: actions/upload-artifact@v4
         with:
-          name: InputRelay-${{ matrix.arch }}
+          name: InputRelay-arm64
           path: dist/*.zip
           if-no-files-found: error
           retention-days: 14
@@ -106,5 +98,5 @@ jobs:
           else
             gh release create "$VERSION" InputRelay-*.zip SHA256SUMS.txt \
               --verify-tag --title "InputRelay $VERSION" --generate-notes \
-              --notes '下载 arm64 版本用于 Apple Silicon Mac，x86_64 版本用于 Intel Mac。解压后将 InputRelay.app 拖入“应用程序”。当前构建使用临时签名，尚未经过 Apple 公证，首次打开可能需要在系统设置的“隐私与安全性”中允许。'
+              --notes '此版本适用于 Apple Silicon（M 系列）Mac。解压后将 InputRelay.app 拖入“应用程序”。当前构建使用临时签名，尚未经过 Apple 公证，首次打开可能需要在系统设置的“隐私与安全性”中允许。'
           fi
