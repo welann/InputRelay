@@ -1,96 +1,272 @@
-# InputRelay 开发指南
+# 开发指南
 
-## 开发环境设置
+## 🔧 开发环境设置
 
 ### 必需工具
 
-- Xcode 16.0 或更高版本
-- Swift 6.0 或更高版本
-- macOS 14.0 (Sonoma) 或更高版本
+- **Swift 工具链**: 6.0 或更高版本
+  - CommandLineTools: `xcode-select --install`
+  - 或完整的 Xcode（从 Mac App Store 安装）
+- **Git**: 用于版本控制
+- **macOS 14.0+**: 开发和测试
 
-### 克隆项目
+### 验证环境
 
 ```bash
+# 检查 Swift 版本
+swift --version
+# 应显示: Swift version 6.x
+
+# 检查工具链
+xcode-select -p
+# 应显示工具链路径
+
+# 克隆仓库
 git clone https://github.com/yourusername/InputRelay.git
 cd InputRelay
 ```
 
-### 构建项目
+## 📦 构建项目
 
-#### 使用 Swift Package Manager
+### 快速构建
 
 ```bash
-# 调试构建
-swift build
+# Debug 构建（默认，保留调试符号）
+./build.sh
 
-# 发布构建
-swift build -c release
+# Release 构建（优化，体积更小）
+./build.sh release
 
-# 运行
-swift run
+# 查看生成的 .app
+ls -lh .build/InputRelay.app/Contents/MacOS/InputRelay
 ```
 
-## 项目结构
+### 手动构建步骤
+
+如果需要更细粒度的控制：
+
+```bash
+# 1. 仅编译二进制文件（不打包）
+swift build -c release
+
+# 2. 查看二进制位置
+swift build -c release --show-bin-path
+# 输出: .build/arm64-apple-macosx/release
+
+# 3. 运行二进制（不需要 .app bundle）
+.build/arm64-apple-macosx/release/InputRelay
+```
+
+### 构建脚本详解
+
+`build.sh` 执行以下步骤：
+
+1. 使用 `swift build` 编译源码
+2. 创建标准 `.app` bundle 目录结构
+3. 复制可执行文件到 `Contents/MacOS/`
+4. 复制 `Info.plist` 和资源文件
+5. 复制编译产物中的 `.bundle` 资源
+6. 进行 ad-hoc 代码签名
+
+## 🧪 测试
+
+### 运行应用
+
+```bash
+# 启动应用（会在菜单栏显示）
+open .build/InputRelay.app
+
+# 或直接运行二进制
+.build/arm64-apple-macosx/debug/InputRelay
+```
+
+### 调试技巧
+
+**查看日志输出**:
+
+```bash
+# 运行并查看控制台日志
+.build/arm64-apple-macosx/debug/InputRelay 2>&1 | tee /tmp/inputrelay.log
+```
+
+**权限问题**:
+
+- 首次运行需要授予辅助功能权限
+- 每次重新构建后，签名会改变，可能需要重新授权
+- 在系统设置中移除旧条目，重新添加
+
+**手柄连接测试**:
+
+```bash
+# 检查 HID 设备
+ioreg -p IOUSB -w0 | grep -i gamepad
+```
+
+### 单元测试
+
+（待添加）
+
+```bash
+# 运行测试
+swift test
+
+# 测试覆盖率
+swift test --enable-code-coverage
+```
+
+## 🏗️ 项目结构
 
 ```
 InputRelay/
-├── Sources/
-│   ├── App/                    # 应用程序入口
-│   ├── Core/                   # 核心业务逻辑
-│   ├── Models/                 # 数据模型
-│   ├── Views/                  # SwiftUI 视图
-│   ├── Utilities/              # 工具类
-│   └── Resources/              # 资源文件
-├── docs/                       # 文档
-├── Package.swift               # SPM 配置
-└── README.md
+├── InputRelay/               # 主代码目录
+│   ├── Sources/              # Swift 源文件
+│   │   ├── App/              # 应用入口和菜单栏
+│   │   ├── Core/             # 核心引擎（手柄、鼠标、键盘）
+│   │   ├── Models/           # 数据模型
+│   │   ├── Views/            # SwiftUI 视图
+│   │   └── Utilities/        # 工具类
+│   └── Resources/            # 资源文件
+│       ├── Info.plist        # 应用元数据
+│       └── Presets/          # 预设配置
+├── Package.swift             # Swift Package 清单
+├── build.sh                  # 构建脚本
+└── docs/                     # 文档
 ```
 
-## 编码规范
+## 📝 编码规范
 
 ### Swift 风格
 
-遵循 Swift API Design Guidelines
+- 使用 Swift 标准库命名约定
+- 类型名使用 `PascalCase`
+- 变量和函数使用 `camelCase`
+- 私有成员添加 `private` 修饰符
+- 使用 `// MARK:` 组织代码
+
+### 并发安全
+
+本项目使用 **Swift 6 严格并发检查**：
+
+- 主线程 UI 类使用 `@MainActor`
+- IOKit 回调使用独立上下文对象
+- 避免在 `deinit` 中访问 actor 隔离属性
+- 使用 `Task { @MainActor in ... }` 跨隔离域调用
+
+### 注释
+
+- 为复杂逻辑添加注释
+- 公开 API 使用文档注释 `///`
+- 解释"为什么"而不是"做什么"
+
+### 示例
 
 ```swift
-// 命名
-class GamepadManager { }          // UpperCamelCase for types
-let activeProfile: Profile        // lowerCamelCase for properties
-func startMonitoring() { }        // lowerCamelCase for functions
+/// 手柄管理器 - 负责检测和监听手柄输入
+@MainActor
+final class GamepadManager: ObservableObject {
+    @Published private(set) var isConnected = false
+    
+    // MARK: - HID Setup
+    
+    func start() {
+        // IOKit 回调在 HID RunLoop 线程上触发，
+        // 使用独立上下文对象避免跨隔离域捕获 self
+        let context = HIDContext(manager: self)
+        // ...
+    }
+}
 ```
 
-## 测试
+## 🐛 常见问题
+
+### 编译错误
+
+**"SDK is not supported by the compiler"**
+
+这通常是虚假报告，由沙盒阻止 clang 模块缓存导致。解决方案：
 
 ```bash
-# 运行所有测试
-swift test
+# 设置自定义缓存目录
+export CLANG_MODULE_CACHE_PATH=/tmp/ir-cache/clang
+export SWIFT_MODULE_CACHE_PATH=/tmp/ir-cache/swift
 
-# 运行特定测试
-swift test --filter GamepadManagerTests
+# 禁用 SwiftPM 嵌套沙盒
+swift build --disable-sandbox
 ```
 
-## 构建和发布
+**"File not found: Resources"**
+
+确保 `Package.swift` 的 `path` 指向 `InputRelay/`（不是 `InputRelay/Sources/`），
+并且 `resources` 指向 `Resources/Presets`。
+
+### 运行时问题
+
+**手柄不响应**
+
+1. 检查菜单栏图标颜色（绿色 = 已连接）
+2. 确认辅助功能权限已授予
+3. 检查日志输出是否有 HID 相关错误
+
+**UI 不显示**
+
+- 确认使用 `open .build/InputRelay.app` 启动
+- 直接运行二进制文件可能无法加载 SwiftUI 资源
+
+## 🚀 发布流程
 
 ### 创建 Release 构建
 
 ```bash
-swift build -c release
+# 1. 更新版本号
+# 编辑 InputRelay/Resources/Info.plist
+#   CFBundleShortVersionString → "1.0.0"
+#   CFBundleVersion → "1"
+
+# 2. 构建 release 版本
+./build.sh release
+
+# 3. 验证构建产物
+codesign -dv .build/InputRelay.app
+file .build/InputRelay.app/Contents/MacOS/InputRelay
+
+# 4. 测试应用
+open .build/InputRelay.app
 ```
 
-### 代码签名
+### 创建 DMG（可选）
 
-需要 Apple Developer 账号和有效的代码签名证书。
+```bash
+# 创建磁盘映像
+hdiutil create -volname "InputRelay" \
+    -srcfolder .build/InputRelay.app \
+    -ov -format UDZO \
+    InputRelay-v1.0.0.dmg
+```
 
-## 贡献指南
+### 代码签名（分发用）
 
-1. Fork 项目
-2. 创建特性分支
-3. 提交更改
-4. 推送到分支
-5. 开启 Pull Request
+对于公开分发，需要 Apple Developer 账号：
 
-## 资源链接
+```bash
+# 使用开发者证书签名
+codesign --deep --force --verify --verbose \
+    --sign "Developer ID Application: Your Name (TEAM_ID)" \
+    .build/InputRelay.app
 
-- [Swift Documentation](https://swift.org/documentation/)
-- [SwiftUI Documentation](https://developer.apple.com/documentation/swiftui)
-- [IOKit HID Documentation](https://developer.apple.com/documentation/iokit)
+# 公证（notarization）
+xcrun notarytool submit InputRelay-v1.0.0.dmg \
+    --apple-id "your@email.com" \
+    --password "app-specific-password" \
+    --team-id "TEAM_ID"
+```
+
+## 📚 相关资源
+
+- [Swift Package Manager](https://swift.org/package-manager/)
+- [IOKit 文档](https://developer.apple.com/documentation/iokit)
+- [SwiftUI 教程](https://developer.apple.com/tutorials/swiftui)
+- [HID 使用页表](https://usb.org/sites/default/files/hut1_3_0.pdf)
+
+## 🤝 贡献
+
+查看 [CONTRIBUTING.md](../CONTRIBUTING.md) 了解如何贡献代码。

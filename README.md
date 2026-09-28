@@ -41,11 +41,11 @@ _即将添加_
 git clone https://github.com/yourusername/InputRelay.git
 cd InputRelay
 
-# 构建
-swift build -c release
+# 构建（会生成 .app bundle）
+./build.sh release
 
 # 运行
-swift run
+open .build/InputRelay.app
 ```
 
 ### 首次使用
@@ -128,6 +128,9 @@ osascript -e "set volume 5"
 - **IOKit** - 手柄 HID 设备通信
 - **CoreGraphics** - 鼠标和键盘事件模拟
 - **AppKit** - 菜单栏集成和应用监听
+- **Carbon** - 虚拟键码定义
+
+无外部依赖，完全使用 macOS 原生框架。
 
 ## 📚 文档
 
@@ -195,7 +198,7 @@ A: 支持所有标准 HID 游戏手柄，包括 Xbox、PlayStation、Switch Pro 
 A: macOS 要求应用获得辅助功能权限才能模拟键盘和鼠标输入。
 
 **Q: 输入延迟有多少？**  
-A: 在大多数情况下，延迟小于 16ms（60 FPS），几乎感觉不到延迟。
+A: 目标延迟小于 16ms（60 FPS）。实际延迟取决于系统负载和手柄硬件。
 
 **Q: 会与游戏冲突吗？**  
 A: 某些游戏会独占手柄输入。建议在玩游戏时暂停 InputRelay。
