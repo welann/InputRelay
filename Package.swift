@@ -20,7 +20,8 @@ let package = Package(
             path: "InputRelay",
             exclude: [
                 "Resources/Info.plist",
-                "Resources/Assets.xcassets"
+                "Resources/Assets.xcassets",
+                "Resources/AppIcon.icns"
             ],
             resources: [
                 .process("Resources/Presets")
