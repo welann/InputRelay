@@ -89,3 +89,4 @@ coverage/
 # Local configuration
 .env
 .env.local
+.alma-snapshots
