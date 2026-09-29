@@ -54,6 +54,8 @@
 
 前往 [Releases](https://github.com/welann/InputRelay/releases)，下载 `InputRelay-vX.Y.Z-arm64.zip`，适用于 **Apple Silicon（M 系列）Mac**。目前仅提供 arm64 预编译版本。
 
+希望使用最新改动，可[直接下载持续构建版](https://github.com/welann/InputRelay/releases/download/continuous/InputRelay-continuous-arm64.zip)。该预发布版本会在每次推送 `main` 且测试、构建成功后自动更新，详情见[持续构建 Release](https://github.com/welann/InputRelay/releases/tag/continuous)。
+
 解压后将 `InputRelay.app` 拖入“应用程序”。当前发行版使用临时签名，尚未经过 Apple 公证；若首次打开被 macOS 阻止，可在“系统设置 → 隐私与安全性”中查看并允许打开。
 
 ### 从源码构建
@@ -157,7 +159,11 @@ InputRelay 不会禁用原有键盘和鼠标。玩游戏时建议从菜单栏暂
 
 ### 自动构建与发布
 
-[GitHub Actions](https://github.com/welann/InputRelay/actions/workflows/release.yml) 会在推送 `main`、提交面向 `main` 的 Pull Request 或手动运行时，执行测试并构建 Apple Silicon（arm64）版本。构建完成后，可在运行页面的 Artifacts 中下载 ZIP；这些临时产物保留 14 天。
+[GitHub Actions](https://github.com/welann/InputRelay/actions/workflows/release.yml) 会在推送 `main`、提交面向 `main` 的 Pull Request 或手动运行时，执行测试并构建 Apple Silicon（arm64）版本。
+
+每次推送 `main`（或在 `main` 上手动运行）成功后，会自动更新固定的 `continuous` 预发布版本，替换 ZIP 和 `SHA256SUMS.txt`，并记录对应提交和构建链接。下载地址保持不变；构建失败时保留上次成功发布的文件。若构建期间已有更新提交，旧构建会跳过发布，避免覆盖新版。
+
+Pull Request 只测试和构建，不发布 Release。所有构建仍可从 Actions 的 Artifacts 下载，保留 14 天。
 
 发布正式版本时，使用 `v主版本.次版本.修订号` 格式的标签，例如：
 
