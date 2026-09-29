@@ -10,12 +10,14 @@ struct GamepadStatusView: View {
                 StatusCard(isConnected: gamepadManager.isConnected, controllerName: gamepadManager.controllerName)
                 
                 // 手柄可视化
-                GamepadVisualization(gamepadManager: gamepadManager)
+                GamepadVisualization(gamepadManager: gamepadManager.displayState)
             }
             .padding(24)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(AppTheme.background)
+        .onAppear { gamepadManager.isStatusVisible = true }
+        .onDisappear { gamepadManager.isStatusVisible = false }
     }
 }
 
@@ -59,7 +61,7 @@ struct StatusCard: View {
 // MARK: - 手柄可视化（修复布局）
 
 struct GamepadVisualization: View {
-    @ObservedObject var gamepadManager: GamepadManager
+    @ObservedObject var gamepadManager: GamepadDisplayState
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -175,7 +177,7 @@ struct ShoulderButton: View {
 }
 
 struct DPadView: View {
-    @ObservedObject var gamepadManager: GamepadManager
+    @ObservedObject var gamepadManager: GamepadDisplayState
     
     var body: some View {
         VStack(spacing: 0) {
@@ -214,7 +216,7 @@ struct DPadButton: View {
 }
 
 struct FaceButtonsView: View {
-    @ObservedObject var gamepadManager: GamepadManager
+    @ObservedObject var gamepadManager: GamepadDisplayState
     
     var body: some View {
         VStack(spacing: 0) {

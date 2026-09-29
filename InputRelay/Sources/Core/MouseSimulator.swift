@@ -1,3 +1,4 @@
+import Combine
 import Foundation
 import AppKit
 import CoreGraphics
@@ -8,18 +9,35 @@ class MouseSimulator {
     private let cursorLocation: () -> CGPoint?
     private let displayBounds: () -> [CGRect]
     private let postEvent: (CGEvent) -> Void
+    private let postSequence: ([CGEvent], Int) -> Void
+    private var screenObservation: AnyCancellable?
+    private var cachedDisplayBounds: [CGRect]
+    private var displayBoundsDirty = false
     private var movementRemainder = CGPoint.zero
     private var scrollRemainder: Double = 0
     
     init(
         cursorLocation: @escaping () -> CGPoint? = { CGEvent(source: nil)?.location },
         displayBounds: @escaping () -> [CGRect] = { DesktopGeometry.activeDisplayBounds() },
-        postEvent: @escaping (CGEvent) -> Void = { $0.post(tap: .cghidEventTap) }
+        postEvent: ((CGEvent) -> Void)? = nil
     ) {
         self.cursorLocation = cursorLocation
         self.displayBounds = displayBounds
-        self.postEvent = postEvent
+        self.cachedDisplayBounds = displayBounds()
+        self.postEvent = postEvent ?? { $0.post(tap: .cghidEventTap) }
+        self.postSequence = postEvent.map { sink in { events, _ in events.forEach(sink) } }
+            ?? { InputEventSequence.post($0, pauseBefore: $1) }
         currentPosition = cursorLocation() ?? .zero
+        screenObservation = NotificationCenter.default.publisher(for: NSApplication.didChangeScreenParametersNotification)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.invalidateDisplayBounds() }
+    }
+
+    func invalidateDisplayBounds() { displayBoundsDirty = true }
+
+    func resetMotion() {
+        movementRemainder = .zero
+        scrollRemainder = 0
     }
     
     /// 移动鼠标（相对移动）
@@ -33,7 +51,11 @@ class MouseSimulator {
         guard stepX != 0 || stepY != 0 else { return }
         let origin = cursorLocation() ?? currentPosition
         let proposed = CGPoint(x: origin.x + stepX, y: origin.y + stepY)
-        currentPosition = DesktopGeometry.constrain(proposed, to: displayBounds())
+        if displayBoundsDirty {
+            cachedDisplayBounds = displayBounds()
+            displayBoundsDirty = false
+        }
+        currentPosition = DesktopGeometry.constrain(proposed, to: cachedDisplayBounds)
         
         // 创建鼠标移动事件
         if let event = CGEvent(mouseEventSource: nil,
@@ -66,24 +88,12 @@ class MouseSimulator {
             return
         }
         
-        // 按下
-        if let downEvent = CGEvent(mouseEventSource: nil,
-                                   mouseType: downType,
-                                   mouseCursorPosition: pos,
-                                   mouseButton: button) {
-            postEvent(downEvent)
-        }
-        
-        // 短暂延迟
-        usleep(10_000)  // 10ms
-        
-        // 抬起
-        if let upEvent = CGEvent(mouseEventSource: nil,
-                                mouseType: upType,
-                                mouseCursorPosition: pos,
-                                mouseButton: button) {
-            postEvent(upEvent)
-        }
+        // Create the pair before posting so allocation failure cannot leave a held button.
+        guard let down = CGEvent(mouseEventSource: nil, mouseType: downType,
+                                 mouseCursorPosition: pos, mouseButton: button),
+              let up = CGEvent(mouseEventSource: nil, mouseType: upType,
+                               mouseCursorPosition: pos, mouseButton: button) else { return }
+        postSequence([down, up], 1)
     }
     
     /// 模拟滚轮滚动

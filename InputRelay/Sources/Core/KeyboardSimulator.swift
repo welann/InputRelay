@@ -4,10 +4,11 @@ import Carbon
 
 /// 键盘模拟器 - 负责模拟键盘按键
 class KeyboardSimulator {
-    private let postEvent: (CGEvent) -> Void
+    private let postSequence: ([CGEvent], Int) -> Void
 
-    init(postEvent: @escaping (CGEvent) -> Void = { $0.post(tap: .cghidEventTap) }) {
-        self.postEvent = postEvent
+    init(postEvent: ((CGEvent) -> Void)? = nil) {
+        self.postSequence = postEvent.map { sink in { events, _ in events.forEach(sink) } }
+            ?? { InputEventSequence.post($0, pauseBefore: $1) }
     }
     
     /// 发送键盘快捷键
@@ -38,10 +39,7 @@ class KeyboardSimulator {
             flags.remove(key.flag)
             guard append(key.code, down: false) else { return }
         }
-        for (index, event) in events.enumerated() {
-            if index == downCount { usleep(10_000) }
-            postEvent(event)
-        }
+        postSequence(events, downCount)
     }
     
     /// 发送单个按键（无修饰键）
@@ -55,7 +53,7 @@ class KeyboardSimulator {
         for char in text {
             if let keyCode = charToKeyCode(char) {
                 sendKey(keyCode)
-                usleep(50_000)  // 50ms 延迟
+                // Each key pair is serialized by the event queue without blocking the caller.
             }
         }
     }

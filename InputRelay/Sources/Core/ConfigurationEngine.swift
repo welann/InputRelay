@@ -6,9 +6,9 @@ import Carbon
 @MainActor
 class ConfigurationEngine: ObservableObject {
     @Published var profiles: [Profile] = []
-    @Published var activeProfile: Profile?
+    @Published var activeProfile: Profile? { didSet { updateMotionConfiguration() } }
     /// 映射总开关，由菜单栏的"暂停/恢复映射"控制
-    @Published var isEnabled = true
+    @Published var isEnabled = true { didSet { updateMotionConfiguration() } }
     
     private let gamepadManager: GamepadManager
     private let mouseSimulator: MouseSimulator
@@ -171,7 +171,14 @@ class ConfigurationEngine: ObservableObject {
     
     // MARK: - Event Handling
     
+    private func updateMotionConfiguration() {
+        mouseSimulator.resetMotion()
+        gamepadManager.motionEnabled = isEnabled && activeProfile != nil
+        if let settings = activeProfile?.stickSettings { gamepadManager.motionSettings = settings }
+    }
+
     private func setupGamepadHandler() {
+        gamepadManager.onMotionStopped = { [weak self] in self?.mouseSimulator.resetMotion() }
         gamepadManager.setEventHandler { [weak self] event in
             self?.handleGamepadEvent(event)
         }

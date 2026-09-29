@@ -34,6 +34,23 @@ struct DesktopGeometryTests {
         #expect(DesktopGeometry.constrain(point, to: []) == point)
     }
 
+    @Test func displayBoundsAreCachedUntilInvalidated() {
+        var queries = 0
+        var bounds = [main]
+        var cursor = CGPoint(x: 100, y: 100)
+        let simulator = MouseSimulator(cursorLocation: { cursor }, displayBounds: {
+            queries += 1
+            return bounds
+        }, postEvent: { cursor = $0.location })
+        for _ in 0..<120 { simulator.moveMouse(dx: 1, dy: 0) }
+        #expect(queries == 1)
+        bounds = [CGRect(x: 0, y: 0, width: 150, height: 150)]
+        simulator.invalidateDisplayBounds()
+        simulator.moveMouse(dx: 1, dy: 0)
+        #expect(queries == 2)
+        #expect(cursor.x == 149)
+    }
+
     @Test func simulatorUsesLiveCursorForCrossingAndClicking() {
         var cursor = CGPoint(x: 1915, y: 400)
         let right = CGRect(x: 1920, y: 0, width: 2560, height: 1440)

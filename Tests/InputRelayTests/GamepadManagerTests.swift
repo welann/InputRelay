@@ -1,3 +1,4 @@
+import Combine
 import Foundation
 import GameController
 import Testing
@@ -110,6 +111,55 @@ struct GamepadManagerTests {
         #expect(abs(intervals[1] - 0.01) < 0.000001)
         #expect(abs(intervals[2] - 0.01) < 0.000001)
         #expect(intervals[3] <= 1.0 / 30.0)
+    }
+
+    @Test func motionClockOnlyRunsForUsableStickInput() {
+        let (manager, pad) = fixture()
+        manager.motionEnabled = true
+        #expect(!manager.isMotionTimerRunning)
+        pad.leftThumbstick.setValueForXAxis(0.05, yAxis: 0)
+        manager.sampleInput(advanceSticks: false)
+        #expect(!manager.isMotionTimerRunning)
+        pad.leftThumbstick.setValueForXAxis(0.8, yAxis: 0)
+        manager.sampleInput(advanceSticks: false)
+        #expect(manager.isMotionTimerRunning)
+        manager.isCapturingInput = true
+        #expect(!manager.isMotionTimerRunning)
+        manager.isCapturingInput = false
+        #expect(manager.isMotionTimerRunning)
+        manager.motionEnabled = false
+        #expect(!manager.isMotionTimerRunning)
+        manager.motionEnabled = true
+        manager.motionSettings = StickSettings(leftStickMode: .disabled, rightStickMode: .disabled)
+        #expect(!manager.isMotionTimerRunning)
+        manager.motionSettings = StickSettings(leftStickMode: .scroll, rightStickMode: .disabled)
+        #expect(!manager.isMotionTimerRunning) // Horizontal movement cannot scroll vertically.
+        pad.leftThumbstick.setValueForXAxis(0, yAxis: 0.8)
+        manager.sampleInput(advanceSticks: false)
+        #expect(manager.isMotionTimerRunning)
+        pad.leftThumbstick.setValueForXAxis(0, yAxis: 0)
+        manager.sampleInput(advanceSticks: false)
+        #expect(!manager.isMotionTimerRunning)
+    }
+
+    @Test func outputTicksUseCacheWithoutBroadcastingUIChanges() {
+        let (manager, pad) = fixture()
+        var notifications = 0
+        let observation = manager.objectWillChange.sink { notifications += 1 }
+        defer { observation.cancel() }
+        pad.leftThumbstick.setValueForXAxis(0.8, yAxis: 0)
+        manager.sampleInput(advanceSticks: false)
+        manager.displayState.refresh(from: manager)
+        let cached = manager.leftStick
+        pad.valueChangedHandler = nil
+        pad.leftThumbstick.setValueForXAxis(0, yAxis: 0)
+        var ticks = 0
+        manager.setStickHandler { _ in ticks += 1 }
+        for i in 0..<120 { manager.advanceMotion(timestamp: Double(i) / 120) }
+        #expect(ticks == 120)
+        #expect(manager.leftStick == cached)
+        #expect(manager.displayState.leftStick == cached)
+        #expect(notifications == 0)
     }
 
     @Test func captureDoesNotReplaceMappingHandler() {
