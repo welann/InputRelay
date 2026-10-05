@@ -69,6 +69,8 @@ open .build/InputRelay.app
 
 构建产物位于 `.build/InputRelay.app`，可复制到“应用程序”文件夹后使用。构建脚本默认使用本地临时签名，也可通过 `CODE_SIGN_IDENTITY` 指定签名身份。
 
+若要从 Raycast 搜索并启动，执行 `./install.sh release`，将应用构建并安装到 `~/Applications/InputRelay.app`，同时注册到 macOS。更新前先从菜单栏退出旧版本，安装后重新打开。
+
 若遇到 SDK 或 SwiftUI 宏插件相关构建错误，请参阅[开发文档](docs/DEVELOPMENT.md)。版本发布信息见 [Releases](https://github.com/welann/InputRelay/releases)。
 
 ### 首次使用
@@ -79,7 +81,7 @@ open .build/InputRelay.app
 4. 打开“配置管理”，选择已有配置或点击“新建配置”，设置按键映射和摇杆行为。
 5. 需要针对某个应用切换配置时，在该配置中添加应用匹配规则。
 
-权限状态会自动刷新。关闭主窗口后应用仍在运行，可通过 Dock 或菜单栏重新打开。
+权限状态会自动刷新。应用不显示 Dock 图标；关闭主窗口后仍在运行，可通过菜单栏的“打开设置”或在 Raycast 中再次启动 InputRelay 来重新打开窗口。
 
 ## 使用说明
 
@@ -127,6 +129,10 @@ osascript -e 'set volume output volume 50'
 点击菜单栏中的狐狸图标，可以查看当前配置和连接状态、快速切换配置、暂停或恢复映射，以及打开主窗口或退出应用。
 
 ## 常见问题
+
+### Raycast 只能搜到项目文件夹？
+
+先执行 `./install.sh release`，安装真正的 `.app`；项目文件夹本身不是应用。如果仍未显示，在 Raycast 的 Applications 设置中确认搜索范围包含 `~/Applications`，且 InputRelay 未被取消勾选。参见 [Raycast 应用搜索说明](https://manual.raycast.com/applications)。
 
 ### 支持哪些手柄？
 

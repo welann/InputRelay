@@ -23,7 +23,7 @@
 	<key>LSMinimumSystemVersion</key>
 	<string>14.0</string>
 	<key>LSUIElement</key>
-	<false/>
+	<true/>
 	<key>NSAccessibilityUsageDescription</key>
 	<string>InputRelay 需要辅助功能权限来模拟键盘和鼠标操作，以便将手柄输入转换为系统控制。</string>
 	<key>NSAppleEventsUsageDescription</key>

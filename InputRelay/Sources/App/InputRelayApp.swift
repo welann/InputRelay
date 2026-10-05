@@ -28,7 +28,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     )
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        NSApp.setActivationPolicy(.regular)
+        // 与 LSUIElement 保持一致；直接运行 SwiftPM 二进制时也隐藏 Dock 图标。
+        NSApp.setActivationPolicy(.accessory)
         permissionManager.startMonitoring()
 
         // 配置引擎需要先初始化，以加载并激活默认配置

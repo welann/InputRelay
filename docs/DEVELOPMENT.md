@@ -31,11 +31,14 @@ cd InputRelay
 ### 快速构建
 
 ```bash
-# Debug 构建（默认，保留调试符号）
-./build.sh
+# Debug 构建（保留调试符号）
+./build.sh debug
 
 # Release 构建（优化，体积更小）
 ./build.sh release
+
+# 构建并安装到 ~/Applications，供 Raycast 搜索启动
+./install.sh release
 
 # 查看生成的 .app
 ls -lh .build/InputRelay.app/Contents/MacOS/InputRelay
@@ -73,7 +76,7 @@ swift build -c release --show-bin-path
 ### 运行应用
 
 ```bash
-# 启动应用（直接显示主窗口，同时显示 Dock 和菜单栏入口）
+# 启动应用（直接显示主窗口，保留菜单栏入口，不显示 Dock 图标）
 open .build/InputRelay.app
 
 # 或直接运行二进制

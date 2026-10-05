@@ -38,7 +38,7 @@ if [ ! -x "$BINARY" ]; then
 fi
 
 # 2. 组装 .app bundle
-#    标准应用在启动时显示窗口，并保留菜单栏快捷入口。
+#    菜单栏应用在启动时显示窗口，不显示 Dock 图标。
 echo "📦 组装 $APP_NAME.app..."
 rm -rf "$APP_BUNDLE"
 mkdir -p "$APP_BUNDLE/Contents/MacOS" "$APP_BUNDLE/Contents/Resources"
