@@ -9,6 +9,7 @@ final class GamepadManager: ObservableObject {
     @Published private(set) var controllerName: String?
     private(set) var lastEvent: GamepadEvent?
     private(set) var buttonStates: [GamepadButton: Float] = [:]
+    private var pressedTriggers = Set<GamepadButton>()
     private(set) var leftStick = SIMD2<Float>.zero
     private(set) var rightStick = SIMD2<Float>.zero
     let displayState = GamepadDisplayState()
@@ -167,7 +168,20 @@ final class GamepadManager: ObservableObject {
         guard previous != value else { return }
         buttonStates[button] = value
         displayDirty = true
-        // 扳机是模拟量；只在跨越按下阈值时触发动作，避免一次扣动连续点击。
+        // 扳机按下后，必须松至 0.2 以下（含边界）才能再次触发。
+        // 单独保存逻辑状态，避免模拟值在 0.5 附近波动时重复点击。
+        if button == .leftTrigger || button == .rightTrigger {
+            let wasPressed = pressedTriggers.contains(button)
+            let isPressed = value > (wasPressed ? 0.2 : 0.5)
+            guard wasPressed != isPressed else { return }
+            if isPressed {
+                pressedTriggers.insert(button)
+            } else {
+                pressedTriggers.remove(button)
+            }
+            emit(button, value: value)
+            return
+        }
         if (previous > 0.5) != (value > 0.5) {
             emit(button, value: value)
         }

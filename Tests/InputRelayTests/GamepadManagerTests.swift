@@ -65,6 +65,70 @@ struct GamepadManagerTests {
         #expect(manager.getStickAxes(isLeft: false).x == 0)
     }
 
+    @Test func triggerNoiseNearPressThresholdDoesNotRepeatClicks() {
+        let (manager, pad) = fixture()
+        var events: [GamepadEvent] = []
+        manager.setEventHandler { events.append($0) }
+        let triggers: [(GamepadButton, GCControllerButtonInput)] = [
+            (.leftTrigger, pad.leftTrigger), (.rightTrigger, pad.rightTrigger)
+        ]
+        for (button, input) in triggers {
+            for value: Float in [0.48, 0.53, 0.49, 0.56, 1, 0.48, 0.52, 0.3] {
+                input.setValue(value)
+                manager.sampleInput()
+            }
+            let presses = events.filter { $0.button == button && $0.isPressed }
+            #expect(presses.count == 1)
+            #expect(events.filter { $0.button == button && !$0.isPressed }.isEmpty)
+            // 原始模拟值仍更新，状态页面可以展示实际扳机行程。
+            #expect(abs(manager.getButtonState(button) - 0.3) < 0.0001)
+            input.setValue(0.1)
+            manager.sampleInput()
+            #expect(events.filter { $0.button == button && !$0.isPressed }.count == 1)
+        }
+    }
+
+    @Test func triggerReleaseRearmsWithoutDelayingConsecutivePresses() {
+        let (manager, pad) = fixture()
+        var events: [GamepadEvent] = []
+        manager.setEventHandler { events.append($0) }
+        for input in [pad.leftTrigger, pad.rightTrigger] {
+            for value: Float in [0.5, 0.51, 0.21, 0.49, 0.55, 0.2, 0.21, 0.19, 0.5, 0.51, 0] {
+                input.setValue(value)
+                manager.sampleInput()
+            }
+        }
+        for button in [GamepadButton.leftTrigger, .rightTrigger] {
+            #expect(events.filter { $0.button == button }.map(\.isPressed) == [true, false, true, false])
+        }
+    }
+
+    @Test func disconnectReleasesLatchedTriggersBeforeControllerSwitch() {
+        let first = GCController.withExtendedGamepad()
+        let second = GCController.withExtendedGamepad()
+        var available = [first]
+        let manager = GamepadManager(controllers: { available })
+        var events: [GamepadEvent] = []
+        manager.setEventHandler { events.append($0) }
+        manager.refreshControllers()
+        for value: Float in [0.8, 0.3] {
+            first.extendedGamepad!.leftTrigger.setValue(value)
+            first.extendedGamepad!.rightTrigger.setValue(value)
+            manager.sampleInput()
+        }
+        available = []
+        manager.refreshControllers()
+        #expect(!manager.isConnected)
+        available = [second]
+        manager.refreshControllers()
+        second.extendedGamepad!.leftTrigger.setValue(0.8)
+        second.extendedGamepad!.rightTrigger.setValue(0.8)
+        manager.sampleInput()
+        for button in [GamepadButton.leftTrigger, .rightTrigger] {
+            #expect(events.filter { $0.button == button }.map(\.isPressed) == [true, false, true])
+        }
+    }
+
     @Test func sticksReturnToCenterAndKeepUpPositive() {
         let (manager, pad) = fixture()
         pad.leftThumbstick.setValueForXAxis(-0.8, yAxis: 0.9)
